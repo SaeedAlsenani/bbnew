@@ -90,13 +90,13 @@ const Bubble: React.FC<BubbleProps> = ({
       if (isDragging) {
         e.preventDefault();
         e.stopPropagation();
-        
+
         // Calculate drag distance to determine if this is a drag or tap
         const dragDistance = Math.sqrt(
           Math.pow(e.clientX - dragStartPositionRef.current.x, 2) +
-          Math.pow(e.clientY - dragStartPositionRef.current.y, 2)
+            Math.pow(e.clientY - dragStartPositionRef.current.y, 2),
         );
-        
+
         if (dragDistance > 5) {
           hasDraggedRef.current = true;
         }
@@ -572,7 +572,7 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
           // Direct position update for immediate response
           const bubble = filteredBubbles.find((b) => b.id === id);
           const radius = bubble ? bubble.size / 2 : 50;
-          
+
           const targetX = Math.max(
             radius,
             Math.min(dimensions.width - radius, x),
@@ -666,8 +666,8 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
           );
         })}
 
-        {/* Enhanced center bubble with username */}
-        <div
+        {/* Enhanced center bubble with username - physics-aware positioning */}
+        <motion.div
           className="absolute pointer-events-none"
           style={{
             left: dimensions.width / 2 - 60,
@@ -686,14 +686,23 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
               "0 0 30px rgba(255, 255, 255, 0.1), inset 0 0 20px rgba(255, 255, 255, 0.05)",
             zIndex: 0,
           }}
+          animate={{
+            scale: [1, 1.02, 1],
+            opacity: [0.8, 0.9, 0.8],
+          }}
+          transition={{
+            duration: 4,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
         >
           <span
             className="text-sm font-medium"
             style={{ textShadow: "0 0 8px rgba(0,0,0,0.8)" }}
           >
-            @giftbubbles_bot
+            @Gift_Graphs_bot
           </span>
-        </div>
+        </motion.div>
 
         {/* Gift Detail Modal */}
         <GiftDetailModal

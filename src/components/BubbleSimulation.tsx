@@ -35,7 +35,7 @@ interface BubbleProps {
   onTap: () => void;
 }
 
-// Enhanced Bubble component with improved shader design and drag handling
+// Enhanced Bubble component with performance optimizations
 const Bubble: React.FC<BubbleProps> = ({
   id,
   name,
@@ -52,21 +52,26 @@ const Bubble: React.FC<BubbleProps> = ({
   onTap,
 }) => {
   const isPositive = percentChange >= 0;
-  const baseColor = isPositive ? "34, 197, 94" : "239, 68, 68"; // green-500 : red-500
+  const baseColor = isPositive ? "0, 255, 0" : "255, 0, 0"; // green : red
 
-  // Enhanced gradient for glowing translucent sphere effect
+  // Check for reduced motion preference
+  const prefersReducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+
+  // Dynamic gradient based on price movement with reduced glow intensity
   const gradientStyle = {
-    background: `radial-gradient(circle at 30% 30%, 
-      rgba(255, 255, 255, 0.4) 0%, 
-      rgba(${baseColor}, 0.6) 20%, 
-      rgba(${baseColor}, 0.8) 60%, 
-      rgba(${baseColor}, 0.95) 100%)`,
-    boxShadow: `
-      0 0 ${size * 0.3}px rgba(${baseColor}, 0.6),
-      inset 0 0 ${size * 0.2}px rgba(255, 255, 255, 0.2),
-      0 ${size * 0.1}px ${size * 0.2}px rgba(0, 0, 0, 0.3)
-    `,
-    border: `1px solid rgba(${baseColor}, 0.4)`,
+    background: `radial-gradient(circle at center, 
+      rgba(0, 0, 0, 0.8) 0%, 
+      rgba(0, 0, 0, 0.6) 40%, 
+      rgba(${baseColor}, 0.2) 70%, 
+      rgba(${baseColor}, 0.6) 85%, 
+      rgba(${baseColor}, 0.8) 100%)`,
+    // Reduced glow effect intensity
+    boxShadow: prefersReducedMotion
+      ? `0 0 ${size * 0.15}px rgba(${baseColor}, 0.4), inset 0 0 ${size * 0.05}px rgba(${baseColor}, 0.2)`
+      : `0 0 ${size * 0.25}px rgba(${baseColor}, 0.5), 0 0 ${size * 0.15}px rgba(${baseColor}, 0.3), inset 0 0 ${size * 0.05}px rgba(${baseColor}, 0.2)`,
+    border: `2px solid rgba(${baseColor}, 0.7)`,
   };
 
   const dragStartTimeRef = useRef<number>(0);
@@ -147,7 +152,7 @@ const Bubble: React.FC<BubbleProps> = ({
 
   return (
     <div
-      className="absolute flex flex-col items-center justify-center cursor-pointer select-none touch-none"
+      className={`absolute flex flex-col items-center justify-center cursor-pointer select-none touch-none ${isDragging ? "bubble-optimized" : "bubble-static"}`}
       style={{
         width: size,
         height: size,
@@ -157,7 +162,10 @@ const Bubble: React.FC<BubbleProps> = ({
         top: y - size / 2,
         zIndex: isDragging ? 1000 : 1,
         transform: isDragging ? "scale(1.05)" : "scale(1)",
-        transition: isDragging ? "none" : "transform 0.1s ease-out",
+        transition:
+          isDragging || prefersReducedMotion
+            ? "none"
+            : "transform 0.1s ease-out",
         willChange: isDragging ? "transform" : "auto",
       }}
       onPointerDown={handlePointerDown}
@@ -168,26 +176,34 @@ const Bubble: React.FC<BubbleProps> = ({
     >
       <div
         className="text-2xl mb-1 pointer-events-none"
-        style={{ textShadow: "0 0 8px rgba(0,0,0,0.8)" }}
+        style={{
+          textShadow: prefersReducedMotion ? "none" : "0 0 6px rgba(0,0,0,0.6)",
+        }}
       >
         {icon}
       </div>
       <div
         className="text-xs text-white font-semibold pointer-events-none"
-        style={{ textShadow: "0 0 4px rgba(0,0,0,0.8)" }}
+        style={{
+          textShadow: prefersReducedMotion ? "none" : "0 0 4px rgba(0,0,0,0.6)",
+        }}
       >
         {name}
       </div>
       <div
         className={`text-xs font-bold pointer-events-none ${isPositive ? "text-green-200" : "text-red-200"}`}
-        style={{ textShadow: "0 0 4px rgba(0,0,0,0.8)" }}
+        style={{
+          textShadow: prefersReducedMotion ? "none" : "0 0 4px rgba(0,0,0,0.6)",
+        }}
       >
         {isPositive ? "+" : ""}
         {percentChange.toFixed(2)}%
       </div>
       <div
         className="text-xs text-white pointer-events-none"
-        style={{ textShadow: "0 0 4px rgba(0,0,0,0.8)" }}
+        style={{
+          textShadow: prefersReducedMotion ? "none" : "0 0 4px rgba(0,0,0,0.6)",
+        }}
       >
         {value}
       </div>
@@ -221,6 +237,14 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
   const lastUpdateTimeRef = useRef<number>(0);
   const [selectedBubble, setSelectedBubble] = useState<BubbleData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Performance optimization states
+  const [motionEnabled, setMotionEnabled] = useState<boolean>(true);
+  const [animationFrozen, setAnimationFrozen] = useState<boolean>(false);
+  const animationStartTimeRef = useRef<number>(Date.now());
+  const prefersReducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
 
   // Mock data if none provided
   const bubbleData =
@@ -405,9 +429,33 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Enhanced physics simulation with improved collision detection
+  // Auto-freeze animation after 3 seconds for performance
   useEffect(() => {
-    if (Object.keys(positions).length === 0) return;
+    if (!motionEnabled || prefersReducedMotion) {
+      setAnimationFrozen(true);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      if (!isDragging) {
+        setAnimationFrozen(true);
+      }
+    }, 3000); // Freeze after 3 seconds
+
+    return () => clearTimeout(timer);
+  }, [motionEnabled, isDragging, prefersReducedMotion]);
+
+  // Re-enable animation on user interaction
+  const reactivateAnimation = useCallback(() => {
+    if (motionEnabled && !prefersReducedMotion) {
+      setAnimationFrozen(false);
+      animationStartTimeRef.current = Date.now();
+    }
+  }, [motionEnabled, prefersReducedMotion]);
+
+  // Enhanced physics simulation with performance optimizations
+  useEffect(() => {
+    if (Object.keys(positions).length === 0 || animationFrozen) return;
 
     const updatePositions = () => {
       const currentTime = performance.now();
@@ -420,7 +468,7 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
       setPositions((prevPositions) => {
         const newPositions = { ...prevPositions };
 
-        // Update positions based on velocity for non-dragged bubbles
+        // Update positions based on velocity for non-dragged bubbles (reduced motion intensity)
         filteredBubbles.forEach((bubble) => {
           if (isDragging === bubble.id) return;
 
@@ -430,13 +478,13 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
           const size = bubble.size;
           const radius = size / 2;
 
-          // Apply subtle floating motion
-          pos.vx += (Math.random() - 0.5) * 0.05 * deltaTime;
-          pos.vy += (Math.random() - 0.5) * 0.05 * deltaTime;
+          // Reduced floating motion for better performance
+          pos.vx += (Math.random() - 0.5) * 0.02 * deltaTime; // Reduced from 0.05
+          pos.vy += (Math.random() - 0.5) * 0.02 * deltaTime; // Reduced from 0.05
 
-          // Apply damping
-          pos.vx *= Math.pow(0.98, deltaTime);
-          pos.vy *= Math.pow(0.98, deltaTime);
+          // Apply stronger damping for quicker settling
+          pos.vx *= Math.pow(0.95, deltaTime); // Increased damping from 0.98
+          pos.vy *= Math.pow(0.95, deltaTime); // Increased damping from 0.98
 
           // Update position
           pos.x += pos.vx * deltaTime;
@@ -460,8 +508,9 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
           }
         });
 
-        // Enhanced collision detection and resolution
-        const resolveCollisions = (iterations = 3) => {
+        // Simplified collision detection for better performance
+        const resolveCollisions = (iterations = 2) => {
+          // Reduced from 3 iterations
           for (let iter = 0; iter < iterations; iter++) {
             for (let i = 0; i < filteredBubbles.length; i++) {
               const bubbleA = filteredBubbles[i];
@@ -544,55 +593,54 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
     return () => {
       cancelAnimationFrame(animationRef.current);
     };
-  }, [dimensions, filteredBubbles, isDragging]);
+  }, [dimensions, filteredBubbles, isDragging, animationFrozen]);
 
   // Enhanced drag handlers with improved performance
   const handleDragStart = useCallback(
     (id: string) => {
+      reactivateAnimation(); // Reactivate animation on drag
       setIsDragging(id);
       const currentPos = positions[id];
       if (currentPos) {
         dragOffsetRef.current = { x: 0, y: 0 };
       }
     },
-    [positions],
+    [positions, reactivateAnimation],
   );
 
   const handleDrag = useCallback(
     (id: string, x: number, y: number) => {
       setDragPosition({ x, y });
 
-      // Use requestAnimationFrame for smooth updates
-      requestAnimationFrame(() => {
-        setPositions((prev) => {
-          const newPositions = { ...prev };
-          const pos = newPositions[id];
-          if (!pos) return prev;
+      // Direct position update for immediate response - no requestAnimationFrame delay
+      setPositions((prev) => {
+        const newPositions = { ...prev };
+        const pos = newPositions[id];
+        if (!pos) return prev;
 
-          // Direct position update for immediate response
-          const bubble = filteredBubbles.find((b) => b.id === id);
-          const radius = bubble ? bubble.size / 2 : 50;
+        // Direct position update for immediate response
+        const bubble = filteredBubbles.find((b) => b.id === id);
+        const radius = bubble ? bubble.size / 2 : 50;
 
-          const targetX = Math.max(
-            radius,
-            Math.min(dimensions.width - radius, x),
-          );
-          const targetY = Math.max(
-            radius,
-            Math.min(dimensions.height - radius, y),
-          );
+        const targetX = Math.max(
+          radius,
+          Math.min(dimensions.width - radius, x),
+        );
+        const targetY = Math.max(
+          radius,
+          Math.min(dimensions.height - radius, y),
+        );
 
-          // Calculate velocity for momentum on release
-          const dx = targetX - pos.x;
-          const dy = targetY - pos.y;
+        // Calculate velocity for momentum on release
+        const dx = targetX - pos.x;
+        const dy = targetY - pos.y;
 
-          pos.vx = dx * 0.5; // Increased responsiveness
-          pos.vy = dy * 0.5;
-          pos.x = targetX;
-          pos.y = targetY;
+        pos.vx = dx * 0.5; // Increased responsiveness
+        pos.vy = dy * 0.5;
+        pos.x = targetX;
+        pos.y = targetY;
 
-          return newPositions;
-        });
+        return newPositions;
       });
     },
     [dimensions, filteredBubbles],
@@ -616,11 +664,15 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
     setDragPosition(null);
   }, [isDragging]);
 
-  const handleBubbleTap = useCallback((bubble: BubbleData) => {
-    // Immediate modal opening
-    setSelectedBubble(bubble);
-    setIsModalOpen(true);
-  }, []);
+  const handleBubbleTap = useCallback(
+    (bubble: BubbleData) => {
+      reactivateAnimation(); // Reactivate animation on tap
+      // Immediate modal opening
+      setSelectedBubble(bubble);
+      setIsModalOpen(true);
+    },
+    [reactivateAnimation],
+  );
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
@@ -666,7 +718,7 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
           );
         })}
 
-        {/* Enhanced center bubble with username - physics-aware positioning */}
+        {/* Enhanced center bubble with username - performance optimized */}
         <motion.div
           className="absolute pointer-events-none"
           style={{
@@ -682,14 +734,20 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
             justifyContent: "center",
             color: "white",
             border: "1px solid rgba(255, 255, 255, 0.15)",
-            boxShadow:
-              "0 0 30px rgba(255, 255, 255, 0.1), inset 0 0 20px rgba(255, 255, 255, 0.05)",
+            // Simplified box-shadow for better performance
+            boxShadow: prefersReducedMotion
+              ? "0 2px 10px rgba(255, 255, 255, 0.1)"
+              : "0 0 20px rgba(255, 255, 255, 0.1), inset 0 0 15px rgba(255, 255, 255, 0.05)",
             zIndex: 0,
           }}
-          animate={{
-            scale: [1, 1.02, 1],
-            opacity: [0.8, 0.9, 0.8],
-          }}
+          animate={
+            motionEnabled && !prefersReducedMotion && !animationFrozen
+              ? {
+                  scale: [1, 1.02, 1],
+                  opacity: [0.8, 0.9, 0.8],
+                }
+              : {}
+          }
           transition={{
             duration: 4,
             repeat: Infinity,
@@ -698,7 +756,11 @@ const BubbleSimulation: React.FC<BubbleSimulationProps> = ({ data = [] }) => {
         >
           <span
             className="text-sm font-medium"
-            style={{ textShadow: "0 0 8px rgba(0,0,0,0.8)" }}
+            style={{
+              textShadow: prefersReducedMotion
+                ? "none"
+                : "0 0 6px rgba(0,0,0,0.6)",
+            }}
           >
             @Gift_Graphs_bot
           </span>

@@ -1,16 +1,16 @@
-import React, { useState } from "react";
-import BubbleSimulation from "./BubbleSimulation";
+import BubbleCanvas from "@/components/BubbleCanvas";
+import GiftModal from "@/components/GiftModal";
+import { useState } from "react";
 
-interface HomeProps {
-  className?: string;
-}
+export default function App() {
+  const [selectedGift, setSelectedGift] = useState(null);
 
-const Home: React.FC<HomeProps> = ({ className = "" }) => {
   return (
-    <div className={`flex flex-col w-full h-screen bg-gray-900 ${className}`}>
-      <BubbleSimulation />
-    </div>
+    <>
+      <BubbleCanvas onBubbleClick={(gift) => setSelectedGift(gift)} />
+      {selectedGift && (
+        <GiftModal data={selectedGift} onClose={() => setSelectedGift(null)} />
+      )}
+    </>
   );
-};
-
-export default Home;
+}

@@ -22,5 +22,12 @@ export default defineConfig({
   server: {
     // @ts-ignore
     allowedHosts: true,
-  }
+  },
+
+  // ✅ هذا هو الجزء المضاف لحل المشكلة:
+  build: {
+    rollupOptions: {
+      external: ['firebase/auth'],
+    },
+  },
 });

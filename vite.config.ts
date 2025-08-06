@@ -23,7 +23,6 @@ export default defineConfig({
     // @ts-ignore
     allowedHosts: true,
   },
-
   // ✅ هذا هو الجزء المضاف لحل المشكلة:
   build: {
     rollupOptions: {

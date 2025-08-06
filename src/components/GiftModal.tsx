@@ -203,7 +203,7 @@ const GiftModal = ({ bubbleData, onClose }) => {
                     <circle r="3" fill="#fff" /> {/* Needle pivot */}
 
                     <text x="0" y="10" textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">{value}</text>
-                    <text x="0" y="25" textAnchor="middle" fill="#9ca3af" fontSize="9">FEAR/GREED</text>
+                    <text x="0" y="20" textAnchor="middle" fill="#9ca3af" fontSize="9">FEAR/GREED</text>
                 </g>
             </svg>
         );

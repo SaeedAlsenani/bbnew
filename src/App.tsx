@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { getAuth, signInAnonymously } from 'firebase/auth';
-import { initializeApp } from 'firebase/app';
 
 // Import the separated components
 import BubbleCanvas from '@/components/BubbleCanvas'; // Assuming BubbleCanvas.tsx is in the same directory
@@ -12,25 +10,12 @@ const LuChevronUp = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg
 const LuChevronDown = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
 
 // App ID from the Canvas environment
-const appId = 'physbubble-app';
-const firebaseConfig = {}; // أو ضع بيانات حقيقية لاحقًا
+// أو ضع بيانات حقيقية لاحقًا
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig, 'crypto-bubbles-app-' + appId);
-const auth = getAuth(app);
 
 // Sign in anonymously on load
-const setupAuth = async () => {
-    try {
-        if (!auth.currentUser) {
-            await signInAnonymously(auth);
-        }
-    } catch (error) {
-        console.error("Error signing in anonymously:", error);
-    }
-};
 
-setupAuth();
 
 const App = () => {
     const [cryptoData, setCryptoData] = useState([]);

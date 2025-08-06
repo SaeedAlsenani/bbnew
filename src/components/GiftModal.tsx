@@ -155,58 +155,64 @@ const GiftModal = ({ bubbleData, onClose }) => {
     const fearGreedIndex = 87; // Example value
 
     // Function to draw the semi-circle gauge for Fear & Greed Index
-    const drawGauge = (value, max = 100) => {
-        const radius = 40; // Smaller radius for the gauge
-        const arcWidth = 8;
-        const angleScale = d3.scaleLinear()
-            .domain([0, max])
-            .range([-Math.PI / 2, Math.PI / 2]);
+const drawGauge = (value, max = 100) => {
+    const radius = 40; // Smaller radius for the gauge
+    const arcWidth = 8;
+    const angleScale = d3.scaleLinear()
+        .domain([0, max])
+        .range([-Math.PI / 2, Math.PI / 2]);
 
-        const arcGenerator = d3.arc()
-            .innerRadius(radius - arcWidth)
-            .outerRadius(radius)
-            .startAngle(-Math.PI / 2);
+    const arcGenerator = d3.arc()
+        .innerRadius(radius - arcWidth)
+        .outerRadius(radius)
+        .startAngle(-Math.PI / 2);
 
-        const arcColor = d3.scaleLinear()
-            .domain([0, 50, 100])
-            .range(["#EF4444", "#FBBF24", "#22C55E"]); // Red, Yellow, Green
+    const needleLength = radius - arcWidth - 5;
+    const needleBaseWidth = 2;
 
-        const needleLength = radius - arcWidth - 5;
-        const needleBaseWidth = 2;
+    return (
+        <svg width={radius * 2 + 20} height={radius + 30} viewBox={`0 0 ${radius * 2 + 20} ${radius + 30}`}>
+            {/* التدرج اللوني */}
+            <defs>
+                <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#EF4444" /> {/* أحمر */}
+                    <stop offset="50%" stopColor="#FBBF24" /> {/* أصفر */}
+                    <stop offset="100%" stopColor="#22C55E" /> {/* أخضر */}
+                </linearGradient>
+            </defs>
 
-        return (
-            <svg width={radius * 2 + 20} height={radius + 30} viewBox={`0 0 ${radius * 2 + 20} ${radius + 30}`}>
-                <g transform={`translate(${radius + 10}, ${radius + 10})`}>
-                    {/* Background arc */}
-                    <path d={arcGenerator({ endAngle: Math.PI / 2 })} fill="#4b5563" />
-                    {/* Value arc */}
-                    <path d={arcGenerator({ endAngle: angleScale(value) })} fill={arcColor(value)} />
+            <g transform={`translate(${radius + 10}, ${radius + 10})`}>
+                {/* الخلفية */}
+                <path d={arcGenerator({ endAngle: Math.PI / 2 })} fill="#4b5563" />
+                {/* القوس المتدرج */}
+                <path d={arcGenerator({ endAngle: angleScale(value) })} fill="url(#gaugeGradient)" />
 
-                    {/* Needle */}
-                    <line
-                        x1="0" y1="0"
-                        x2="0" y2={-needleLength}
-                        stroke="#fff"
-                        strokeWidth={needleBaseWidth}
-                        strokeLinecap="round"
-                        transform={`rotate(${angleScale(value) * 180 / Math.PI})`}
-                    >
-                        <animateTransform
-                            attributeName="transform"
-                            type="rotate"
-                            from={`0 0 0`}
-                            to={`${angleScale(value) * 180 / Math.PI} 0 0`}
-                            dur="0.5s"
-                            fill="freeze"
-                        />
-                    </line>
-                    <circle r="3" fill="#fff" /> {/* Needle pivot */}
+                {/* المؤشر */}
+                <line
+                    x1="0" y1="0"
+                    x2="0" y2={-needleLength}
+                    stroke="#fff"
+                    strokeWidth={needleBaseWidth}
+                    strokeLinecap="round"
+                    transform={`rotate(${angleScale(value) * 180 / Math.PI})`}
+                >
+                    <animateTransform
+                        attributeName="transform"
+                        type="rotate"
+                        from={`0 0 0`}
+                        to={`${angleScale(value) * 180 / Math.PI} 0 0`}
+                        dur="0.5s"
+                        fill="freeze"
+                    />
+                </line>
+                <circle r="3" fill="#fff" /> {/* النقطة المركزية */}
 
-                    <text x="0" y="10" textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">{value}</text>
-                    <text x="0" y="20" textAnchor="middle" fill="#9ca3af" fontSize="9">FEAR/GREED</text>
-                </g>
-            </svg>
-        );
+                {/* النص */}
+                <text x="0" y="10" textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">{value}</text>
+                <text x="0" y="20" textAnchor="middle" fill="#9ca3af" fontSize="9">FEAR/GREED</text>
+            </g>
+        </svg>
+    );
     };
 
     return (

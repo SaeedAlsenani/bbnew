@@ -228,7 +228,7 @@ const GiftModal = ({ bubbleData, onClose }) => {
                     {/* Part 2 (Top Left): Fear & Greed Index - Now in top-left */}
                     <div className="flex flex-col items-start justify-center p-2">
                         {drawGauge(fearGreedIndex)}
-                        <div className="bg-gray-700 text-gray-400 text-[10px] font-medium px-1.5 py-0.5 rounded-md mt-0.5 leading-tight">
+                        <div className="bg-gray-700 text-gray-400 text-[10px] font-medium px-1.5 py-0.5 rounded-md mt-3 leading-tight">
   The market in general
 </div>
                     </div>

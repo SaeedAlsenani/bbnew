@@ -12,8 +12,8 @@ const LuChevronUp = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg
 const LuChevronDown = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
 
 // App ID from the Canvas environment
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const appId = 'physbubble-app';
+const firebaseConfig = {}; // أو ضع بيانات حقيقية لاحقًا
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig, 'crypto-bubbles-app-' + appId);

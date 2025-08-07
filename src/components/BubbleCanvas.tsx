@@ -92,6 +92,18 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
             sortedData.sort((a, b) => b.market_cap - a.market_cap);
         }
 
+        // --- IMPORTANT: Add this check before d3.max and sizeScale ---
+        // This prevents TypeError if sortedData becomes empty after filtering
+        if (sortedData.length === 0) {
+            console.log("BubbleCanvas: No data after filtering or initial load. Skipping D3 rendering.");
+            if (simulationRef.current) {
+                simulationRef.current.stop();
+            }
+            botBubbleDataRef.current = null; // Clear bot data if no crypto data is present
+            return; // Exit early if no data to render
+        }
+        // --- End of check ---
+
         const maxMarketCap = d3.max(sortedData, d => d.market_cap);
         const sizeScale = d3.scaleSqrt()
             .domain([0, maxMarketCap])
@@ -142,22 +154,9 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
 
         // Define radial gradients for styling
         const defs = svg.append("defs");
-
-        const blueGradient = defs.append("radialGradient")
-            .attr("id", "blueGradient");
-        blueGradient.append("stop")
-            .attr("offset", "0%")
-            .attr("stop-color", "rgba(0, 0, 0, 0)");
-        blueGradient.append("stop")
-            .attr("offset", "70%")
-            .attr("stop-color", "rgba(33, 150, 243, 0.9)"); // أزرق فاتح - #2196f3
-        blueGradient.append("stop")
-            .attr("offset", "100%")
-            .attr("stop-color", "rgba(21, 101, 192, 0.9)"); // أزرق غامق - #1565c0
         
         const greenGradient = defs.append("radialGradient")
             .attr("id", "greenGradient");
-        
         greenGradient.append("stop")
             .attr("offset", "0%")
             .attr("stop-color", "rgba(0, 0, 0, 0)");
@@ -179,6 +178,13 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
         redGradient.append("stop")
             .attr("offset", "100%")
             .attr("stop-color", "rgba(239, 68, 68, 0.8)");
+
+        // Add the blue gradient for the bot bubble
+        const blueGradient = defs.append("radialGradient")
+            .attr("id", "blueGradient");
+        blueGradient.append("stop").attr("offset", "0%").attr("stop-color", "rgba(0, 0, 0, 0)");
+        blueGradient.append("stop").attr("offset", "70%").attr("stop-color", "rgba(33, 150, 243, 0.9)"); // #2196f3
+        blueGradient.append("stop").attr("offset", "100%").attr("stop-color", "rgba(21, 101, 192, 0.9)"); // #1565c0
 
         // Drag behavior for user interaction
         const drag = d3.drag()
@@ -210,7 +216,7 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
             .attr('r', d => d.r)
             .attr('fill', d => {
                 if (d.isBot) {
-                    return '#2196f3'; // Fixed blue color for bot
+                    return 'url(#blueGradient)'; // Use the blue gradient for the bot
                 }
                 return d.price_change_percentage_24h >= 0 ? 'url(#greenGradient)' : 'url(#redGradient)';
             })

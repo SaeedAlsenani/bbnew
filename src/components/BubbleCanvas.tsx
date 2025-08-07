@@ -142,8 +142,9 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
         // --- D3 Force Simulation Setup ---
         const simulation = d3.forceSimulation(nodes)
             .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('x', d3.forceX(width / 2).strength(0.15))
-            .force('y', d3.forceY(height / 2).strength(0.15))
+            // تعديل: جعل فقاعة البوت تستقر دائمًا في المنتصف بقوة جذب أعلى
+            .force('x', d3.forceX(width / 2).strength(d => d.isBot ? 1.0 : 0.15))
+            .force('y', d3.forceY(height / 2).strength(d => d.isBot ? 1.0 : 0.15))
             .force('collide', d3.forceCollide().radius(d => d.r + 2).strength(0.7))
             .force('charge', d3.forceManyBody().strength(d => -Math.pow(d.r, 1.5) * 0.2))
             .on('tick', () => {
@@ -226,7 +227,8 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
             .attr('text-anchor', 'middle')
             .attr('dominant-baseline', 'central')
             .attr('fill', '#f9fafb')
-            .style('font-size', d => d.isBot ? `${d.r / 4}px` : `${d.r / 3}px`) // Smaller font for bot to ensure fit
+            // تعديل: تصغير حجم خط نص البوت قليلاً
+            .style('font-size', d => d.isBot ? `${d.r / 5}px` : `${d.r / 3}px`) 
             .style('pointer-events', 'none')
             .text(d => d.isBot ? d.symbol : d.symbol.toUpperCase()); // Use d.symbol for bot, d.symbol.toUpperCase() for others
 

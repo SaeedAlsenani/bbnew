@@ -11,6 +11,10 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
     // State for dimensions to ensure responsive rendering
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
+    // This ref will store the bot bubble object once it's created,
+    // so we don't recreate it unnecessarily on every tick if its properties don't change.
+    const botBubbleDataRef = useRef(null);
+
     // Effect to handle dimensions using window.addEventListener and setTimeout for initial load
     useEffect(() => {
         let timeoutId; // To store setTimeout ID for cleanup
@@ -59,13 +63,12 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
         const { width, height } = dimensions;
 
         // Do not proceed with D3 simulation if data is not loaded or dimensions are invalid (0x0)
-        // Updated check for cryptoData to prevent TypeError if it's null/undefined
-        if (!cryptoData || cryptoData.length === 0 || loading || width === 0 || height === 0 || !svgRef.current) {
-            // If simulation exists, stop it to prevent errors with invalid dimensions
+        // Robust check: Ensure cryptoData is an array and not empty, and dimensions are valid.
+        if (!Array.isArray(cryptoData) || cryptoData.length === 0 || loading || width === 0 || height === 0 || !svgRef.current) {
             if (simulationRef.current) {
                 simulationRef.current.stop();
             }
-            console.log("BubbleCanvas: D3 simulation deferred due to invalid dimensions or no data.");
+            console.log("BubbleCanvas: D3 simulation deferred due to invalid data/dimensions.");
             return;
         }
 
@@ -79,9 +82,9 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
         const svg = d3.select(svgRef.current);
         svg.selectAll('*').remove(); // Clear previous SVG elements
 
-        const filteredData = cryptoData.filter(d => selectedCryptos.includes(d.id));
+        const filteredCryptoData = cryptoData.filter(d => selectedCryptos.includes(d.id));
 
-        let sortedData = [...filteredData];
+        let sortedData = [...filteredCryptoData];
         // Note: Sorting logic remains here as it affects bubble data preparation
         // If sortMethod is 'marketCap', sort by market_cap_desc
         // Otherwise, maintain original order (or random if data naturally is)
@@ -89,27 +92,54 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
             sortedData.sort((a, b) => b.market_cap - a.market_cap);
         }
 
+        const maxMarketCap = d3.max(sortedData, d => d.market_cap);
         const sizeScale = d3.scaleSqrt()
-            .domain([0, d3.max(sortedData, d => d.market_cap)])
+            .domain([0, maxMarketCap])
             .range([10, Math.min(width, height) / 8]);
 
-        const nodes = sortedData.map(d => ({ ...d, r: sizeScale(d.market_cap) }));
+        let nodes = sortedData.map(d => ({ ...d, r: sizeScale(d.market_cap) }));
 
-        // Force simulation to add realistic physics
-        // DO NOT MODIFY PHYSICS OR SIMULATION SETTINGS HERE as per user request
+        // --- Bot Bubble Logic ---
+        // Calculate bot bubble radius based on the largest crypto bubble
+        const largestCryptoBubbleRadius = maxMarketCap > 0 ? sizeScale(maxMarketCap) : 0;
+        const botRadius = largestCryptoBubbleRadius * 0.8; // 20% smaller
+
+        // Only create/update bot bubble data if dimensions and largest crypto bubble are valid
+        // And if the bot bubble hasn't been created yet, or if its size needs updating (due to resize/data change)
+        // Using a small tolerance (0.1) to avoid re-creating on tiny floating point differences
+        if (botRadius > 0 && (!botBubbleDataRef.current || Math.abs(botBubbleDataRef.current.r - botRadius) > 0.1)) {
+            botBubbleDataRef.current = {
+                id: 'gift_graphs_bot',
+                name: 'Gift Graphs Bot',
+                symbol: '@Gift_Graphs_bot', // User requested text here
+                image: 'https://placehold.co/100x100/2196f3/FFFFFF?text=BOT', // Fixed image for the bot
+                isBot: true,
+                r: botRadius,
+                // Dummy values for other properties to match cryptoData structure
+                market_cap: 0, 
+                current_price: 0,
+                price_change_percentage_24h: 0,
+            };
+        }
+
+        // Add the bot bubble to the nodes array if it exists
+        if (botBubbleDataRef.current) {
+            nodes.push(botBubbleDataRef.current);
+        }
+
+        // --- D3 Force Simulation Setup ---
         const simulation = d3.forceSimulation(nodes)
             .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('x', d3.forceX(width / 2).strength(0.15)) // Increased strength from 0.05 to 0.15
-            .force('y', d3.forceY(height / 2).strength(0.15)) // Increased strength from 0.05 to 0.15
+            .force('x', d3.forceX(width / 2).strength(0.15))
+            .force('y', d3.forceY(height / 2).strength(0.15))
             .force('collide', d3.forceCollide().radius(d => d.r + 2).strength(0.7))
             .force('charge', d3.forceManyBody().strength(d => -Math.pow(d.r, 1.5) * 0.2))
             .on('tick', () => {
                 bubbleGroup.attr('transform', d => `translate(${d.x},${d.y})`);
             });
 
-        // Save reference to the new simulation
         simulationRef.current = simulation;
-        
+
         // Define radial gradients for styling
         const defs = svg.append("defs");
         
@@ -166,6 +196,9 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
         bubbleGroup.append('circle')
             .attr('r', d => d.r)
             .attr('fill', d => {
+                if (d.isBot) {
+                    return '#2196f3'; // Fixed blue color for bot
+                }
                 return d.price_change_percentage_24h >= 0 ? 'url(#greenGradient)' : 'url(#redGradient)';
             })
             .attr('stroke', 'none');
@@ -176,7 +209,7 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
             .attr('fill', '#f9fafb')
             .style('font-size', d => `${d.r / 3}px`)
             .style('pointer-events', 'none')
-            .text(d => d.symbol.toUpperCase());
+            .text(d => d.isBot ? d.symbol : d.symbol.toUpperCase()); // Use d.symbol for bot, d.symbol.toUpperCase() for others
 
         bubbleGroup.append('image')
             .attr('href', d => d.image)
@@ -185,24 +218,6 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
             .attr('width', d => d.r * 0.8)
             .attr('height', d => d.r * 0.8)
             .style('pointer-events', 'none');
-
-        // Tooltip logic (remains here as it's part of bubble interaction)
-        const showTooltip = (event, d) => {
-            const [x, y] = d3.pointer(event, svgRef.current);
-            // This component doesn't manage tooltip state directly, but it could emit an event
-            // For now, we'll keep the tooltip rendering in App.tsx for simplicity,
-            // but BubbleCanvas is responsible for triggering its display.
-            // This is a simplified tooltip display for the canvas itself, not the modal.
-            // If a tooltip is needed here, it would be managed by a local state or prop.
-        };
-
-        const hideTooltip = () => {
-            // Similar to showTooltip, if a tooltip is needed here, it would be managed locally.
-        };
-
-        // Removed mouseover/mousemove/mouseleave from bubbleGroup as tooltip is handled by App.tsx
-        // If a tooltip is desired directly within the canvas, its state should be managed here
-        // or passed as props from App.tsx.
 
         // Cleanup function for D3 simulation
         return () => {

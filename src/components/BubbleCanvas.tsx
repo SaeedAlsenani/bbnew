@@ -122,9 +122,9 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
         if (botRadius > 0 && (!botBubbleDataRef.current || Math.abs(botBubbleDataRef.current.r - botRadius) > 0.1)) {
             botBubbleDataRef.current = {
                 id: 'gift_graphs_bot',
-                name:
+                name: 'Gift Graphs Bot',
                 symbol: '@Gift_Graphs_bot', // User requested text here
-                image: 'https://placehold.co/100x100/2196f3/FFFFFF?text=BOT', // Fixed image for the bot
+                image: '', // No image for the bot bubble
                 isBot: true,
                 r: botRadius,
                 // Dummy values for other properties to match cryptoData structure
@@ -179,12 +179,12 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
             .attr("offset", "100%")
             .attr("stop-color", "rgba(239, 68, 68, 0.8)");
 
-        // Add the blue gradient for the bot bubble
+        // Add the blue gradient for the bot bubble with new specifications
         const blueGradient = defs.append("radialGradient")
             .attr("id", "blueGradient");
-        blueGradient.append("stop").attr("offset", "0%").attr("stop-color", "rgba(0, 0, 0, 0)");
-        blueGradient.append("stop").attr("offset", "70%").attr("stop-color", "rgba(33, 150, 243, 0.9)"); // #2196f3
-        blueGradient.append("stop").attr("offset", "100%").attr("stop-color", "rgba(21, 101, 192, 0.9)"); // #1565c0
+        blueGradient.append("stop").attr("offset", "0%").attr("stop-color", "rgba(0, 0, 0, 0)"); // Transparent center
+        blueGradient.append("stop").attr("offset", "80%").attr("stop-color", "rgba(21, 101, 192, 0.4)"); // Darker blue, semi-transparent
+        blueGradient.append("stop").attr("offset", "100%").attr("stop-color", "rgba(0, 255, 255, 1)"); // Neon blue at the edge
 
         // Drag behavior for user interaction
         const drag = d3.drag()
@@ -226,16 +226,17 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
             .attr('text-anchor', 'middle')
             .attr('dominant-baseline', 'central')
             .attr('fill', '#f9fafb')
-            .style('font-size', d => `${d.r / 3}px`)
+            .style('font-size', d => d.isBot ? `${d.r / 4}px` : `${d.r / 3}px`) // Smaller font for bot to ensure fit
             .style('pointer-events', 'none')
             .text(d => d.isBot ? d.symbol : d.symbol.toUpperCase()); // Use d.symbol for bot, d.symbol.toUpperCase() for others
 
+        // Remove the image for the bot bubble, keep it for others
         bubbleGroup.append('image')
-            .attr('href', d => d.image)
-            .attr('x', d => -d.r * 0.4)
-            .attr('y', d => -d.r * 0.4)
-            .attr('width', d => d.r * 0.8)
-            .attr('height', d => d.r * 0.8)
+            .attr('href', d => d.isBot ? '' : d.image) // Set href to empty string for bot
+            .attr('x', d => d.isBot ? 0 : -d.r * 0.4) // Center if no image
+            .attr('y', d => d.isBot ? 0 : -d.r * 0.4) // Center if no image
+            .attr('width', d => d.isBot ? 0 : d.r * 0.8) // Set width to 0 for bot
+            .attr('height', d => d.isBot ? 0 : d.r * 0.8) // Set height to 0 for bot
             .style('pointer-events', 'none');
 
         // Cleanup function for D3 simulation

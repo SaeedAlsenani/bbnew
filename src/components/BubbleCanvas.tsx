@@ -122,7 +122,7 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
         if (botRadius > 0 && (!botBubbleDataRef.current || Math.abs(botBubbleDataRef.current.r - botRadius) > 0.1)) {
             botBubbleDataRef.current = {
                 id: 'gift_graphs_bot',
-                name: 'Gift Graphs Bot',
+                name:
                 symbol: '@Gift_Graphs_bot', // User requested text here
                 image: 'https://placehold.co/100x100/2196f3/FFFFFF?text=BOT', // Fixed image for the bot
                 isBot: true,

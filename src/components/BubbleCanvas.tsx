@@ -142,9 +142,22 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
 
         // Define radial gradients for styling
         const defs = svg.append("defs");
+
+        const blueGradient = defs.append("radialGradient")
+            .attr("id", "blueGradient");
+        blueGradient.append("stop")
+            .attr("offset", "0%")
+            .attr("stop-color", "rgba(0, 0, 0, 0)");
+        blueGradient.append("stop")
+            .attr("offset", "70%")
+            .attr("stop-color", "rgba(33, 150, 243, 0.9)"); // أزرق فاتح - #2196f3
+        blueGradient.append("stop")
+            .attr("offset", "100%")
+            .attr("stop-color", "rgba(21, 101, 192, 0.9)"); // أزرق غامق - #1565c0
         
         const greenGradient = defs.append("radialGradient")
             .attr("id", "greenGradient");
+        
         greenGradient.append("stop")
             .attr("offset", "0%")
             .attr("stop-color", "rgba(0, 0, 0, 0)");

@@ -1,74 +1,86 @@
 import React, { useState, useEffect } from 'react';
-
-// Import the separated components
-// تأكد أن هذه المسارات صحيحة في هيكل مشروعك
 import BubbleCanvas from './components/BubbleCanvas';
 import GiftModal from './components/GiftModal';
 
-// Using inline SVG for icons to avoid build issues with external libraries
+// أيقونات SVG (كما هي)
 const LuEye = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>;
 const LuChevronUp = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
 const LuChevronDown = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
 
+// نوع بيانات الهدية
+interface Gift {
+  id: string;
+  name: string;
+  price_ton: number;
+  price_usd: number;
+  price_change_percentage_24h?: number; // إضافة اختيارية لمحاكاة تغير السعر
+}
+
 const App = () => {
-    const [cryptoData, setCryptoData] = useState([]);
+    const [giftsData, setGiftsData] = useState<Gift[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
-    const [selectedCryptos, setSelectedCryptos] = useState([]);
-    const [sortMethod, setSortMethod] = useState('random'); // 'random' or 'marketCap'
-    
-    // حالة جديدة للزر المختار (Day, Week, All time)
-    const [selectedTimeframe, setSelectedTimeframe] = useState('Day'); 
+    const [selectedGifts, setSelectedGifts] = useState<string[]>([]);
+    const [sortMethod, setSortMethod] = useState<'random' | 'price'>('random');
+    const [selectedTimeframe, setSelectedTimeframe] = useState('Day');
+    const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null);
 
-    // State to control the visibility and data of the modal
-    const [selectedBubbleData, setSelectedBubbleData] = useState(null); 
-
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // Fetch cryptocurrency data from CoinGecko API
-                const response = await fetch(
-                    'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h'
-                );
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                setCryptoData(data);
-                setSelectedCryptos(data.map(d => d.id)); // Select all by default
-            } catch (err) {
-                setError('Failed to fetch cryptocurrency data. Please try again later.');
-                console.error("Fetch error:", err);
-            } finally {
-                setLoading(false);
+    // دالة جلب بيانات الهدايا
+    const fetchGiftsData = async () => {
+        try {
+            const response = await fetch('https://YOUR_API_DOMAIN/api/gifts');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        };
-
-        fetchData();
-        // Refresh data every 5 minutes (300000 ms)
-        const interval = setInterval(fetchData, 300000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const handleFilterChange = (cryptoId) => {
-        if (selectedCryptos.includes(cryptoId)) {
-            setSelectedCryptos(selectedCryptos.filter(id => id !== cryptoId));
-        } else {
-            setSelectedCryptos([...selectedCryptos, cryptoId]);
+            const data = await response.json();
+            
+            // تحويل البيانات لتتناسب مع هيكل التطبيق
+            const formattedData = data.map((gift: any, index: number) => ({
+                id: `gift-${index}`,
+                name: gift.name,
+                price_ton: gift.price_ton,
+                price_usd: gift.price_usd,
+                // إضافة تغير سعر عشوائي لمحاكاة الوظيفة الأصلية
+                price_change_percentage_24h: Math.random() > 0.5 ? 
+                    Math.random() * 10 : 
+                    Math.random() * -10
+            }));
+            
+            setGiftsData(formattedData);
+            setSelectedGifts(formattedData.map(g => g.id));
+            setError(null);
+        } catch (err) {
+            setError('فشل في جلب بيانات الهدايا. يرجى المحاولة لاحقاً.');
+            console.error("Fetch error:", err);
+        } finally {
+            setLoading(false);
         }
     };
 
-    // دالة جديدة لتغيير الفترة الزمنية وتحديث الزر النشط
-    const handleTimeframeChange = (timeframe) => {
-        setSelectedTimeframe(timeframe);
-        // هنا يمكنك إضافة منطق لجلب بيانات مختلفة بناءً على الفترة الزمنية
-        // على سبيل المثال:
-        // fetchDataForTimeframe(timeframe);
+    useEffect(() => {
+        fetchGiftsData();
+        // التحديث التلقائي كل 5 دقائق (300000 مللي ثانية)
+        const interval = setInterval(fetchGiftsData, 300000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const handleFilterChange = (giftId: string) => {
+        if (selectedGifts.includes(giftId)) {
+            setSelectedGifts(selectedGifts.filter(id => id !== giftId));
+        } else {
+            setSelectedGifts([...selectedGifts, giftId]);
+        }
     };
 
-    const upCount = cryptoData.filter(d => d.price_change_percentage_24h > 0).length;
-    const downCount = cryptoData.filter(d => d.price_change_percentage_24h < 0).length;
+    const handleTimeframeChange = (timeframe: string) => {
+        setSelectedTimeframe(timeframe);
+        // يمكنك إضافة منطق إضافي هنا حسب الفترة الزمنية
+    };
+
+    // حساب عدد الهدايا الصاعدة والهابطة (بناء على تغير السعر المحاكى)
+    const upCount = giftsData.filter(d => d.price_change_percentage_24h && d.price_change_percentage_24h > 0).length;
+    const downCount = giftsData.filter(d => d.price_change_percentage_24h && d.price_change_percentage_24h < 0).length;
 
     if (loading) {
         return (
@@ -76,7 +88,7 @@ const App = () => {
                 <style>
                     {`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');`}
                 </style>
-                <p className="text-xl">جاري التحميل...</p>
+                <p className="text-xl">جاري تحميل...</p>
             </div>
         );
     }
@@ -93,7 +105,6 @@ const App = () => {
     }
 
     return (
-        // Main container: takes full screen height and arranges content vertically
         <div className="bg-gray-900 h-screen text-gray-100 flex flex-col p-2 font-sans">
             <style>
                 {`
@@ -102,9 +113,8 @@ const App = () => {
                 `}
             </style>
             
-            {/* Compact and responsive control bar */}
+            {/* شريط التحكم (يبقى كما هو مع تغيير البيانات فقط) */}
             <div className="w-full flex items-center justify-between p-1 bg-gray-800 rounded-lg shadow-lg border border-gray-700 mb-2">
-                {/* Left side: Filter button and counts */}
                 <div className="flex items-center space-x-1 md:space-x-2">
                     <div className="relative">
                         <button 
@@ -116,15 +126,15 @@ const App = () => {
                         </button>
                         {isFilterOpen && (
                             <div className="absolute top-full left-0 mt-2 w-56 md:w-64 h-80 overflow-y-auto bg-gray-700 rounded-lg shadow-lg z-50 p-2 border border-gray-600">
-                                {cryptoData.map((crypto) => (
-                                    <div key={crypto.id} className="flex items-center p-2 hover:bg-gray-600 rounded-md cursor-pointer transition-colors duration-150">
+                                {giftsData.map((gift) => (
+                                    <div key={gift.id} className="flex items-center p-2 hover:bg-gray-600 rounded-md cursor-pointer transition-colors duration-150">
                                         <input 
                                             type="checkbox" 
-                                            checked={selectedCryptos.includes(crypto.id)}
-                                            onChange={() => handleFilterChange(crypto.id)}
+                                            checked={selectedGifts.includes(gift.id)}
+                                            onChange={() => handleFilterChange(gift.id)}
                                             className="form-checkbox h-4 w-4 text-green-500 bg-gray-600 border-gray-500 rounded focus:ring-green-500"
                                         />
-                                        <span className="ml-2 text-gray-200 text-sm">{crypto.name} ({crypto.symbol.toUpperCase()})</span>
+                                        <span className="ml-2 text-gray-200 text-sm">{gift.name}</span>
                                     </div>
                                 ))}
                             </div>
@@ -140,7 +150,6 @@ const App = () => {
                     </div>
                 </div>
 
-                {/* Right side: Timeframe and Market Cap buttons */}
                 <div className="flex items-center space-x-1 md:space-x-2">
                     <button 
                         className={`font-bold py-1 px-2 rounded-lg text-xs md:text-sm transition-colors duration-200 ${selectedTimeframe === 'Day' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
@@ -156,32 +165,32 @@ const App = () => {
                     </button>
                     <button 
                         className={`font-bold py-1 px-2 rounded-lg text-xs md:text-sm transition-colors duration-200 ${selectedTimeframe === 'All time' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
-                        onClick={() => handleTimeframeChange('All time')}
+                        onClick={() => handleTimeframeChange('All')}
                     >
-                        All time
+                        All
                     </button>
                     <button 
-                        className={`font-bold py-1 px-2 rounded-lg text-xs md:text-sm transition-colors duration-200 ${sortMethod === 'marketCap' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
-                        onClick={() => setSortMethod(sortMethod === 'marketCap' ? 'random' : 'marketCap')}
+                        className={`font-bold py-1 px-2 rounded-lg text-xs md:text-sm transition-colors duration-200 ${sortMethod === 'price' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
+                        onClick={() => setSortMethod(sortMethod === 'price' ? 'random' : 'price')}
                     >
                         Market Cap
                     </button>
                 </div>
             </div>
             
-            {/* Main bubble container - now handled by BubbleCanvas component */}
+            {/* مكون الفقاعات مع تعديل البيانات المرسلة */}
             <BubbleCanvas
-                cryptoData={cryptoData}
+                data={giftsData.filter(gift => selectedGifts.includes(gift.id))}
                 loading={loading}
-                selectedCryptos={selectedCryptos}
                 sortMethod={sortMethod}
-                onBubbleClick={setSelectedBubbleData} // Callback to set the selected bubble for the modal
+                onBubbleClick={setSelectedBubbleData}
+                isCrypto={false} // إضافة خاصية لتمييز نوع البيانات
             />
 
-            {/* Bubble Details Modal - conditionally rendered */}
+            {/* نافذة التفاصيل */}
             {selectedBubbleData && (
                 <GiftModal 
-                    bubbleData={selectedBubbleData} 
+                    giftData={selectedBubbleData} 
                     onClose={() => setSelectedBubbleData(null)} 
                 />
             )}
@@ -190,4 +199,3 @@ const App = () => {
 };
 
 export default App;
-

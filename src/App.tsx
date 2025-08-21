@@ -2,104 +2,177 @@ import React, { useState, useEffect } from 'react';
 import BubbleCanvas from './components/BubbleCanvas';
 import GiftModal from './components/GiftModal';
 
-// أيقونات SVG (كما هي)
+// SVG Icons (kept as is)
 const LuEye = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>;
 const LuChevronUp = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
 const LuChevronDown = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
 
-// نوع بيانات الهدية
+// Define the Gift interface to match the API response structure from physbubble-bot
 interface Gift {
-  id: string;
-  name: string;
-  price_ton: number;
-  price_usd: number;
-  price_change_percentage_24h?: number; // إضافة اختيارية لمحاكاة تغير السعر
+  id: string; // The external_id from your bot's API for variants, or a generated ID for models
+  model_name: string; // Used for identifying the model in BubbleCanvas
+  variant_name?: string; // Specific variant name if available
+  min_price_ton: number; // Price in TON
+  min_price_usd: number; // Price in USD
+  image: string; // Image URL
+  // Properties required by BubbleCanvas (mapped from bot's API response)
+  name: string; // Renamed model_name to name for BubbleCanvas
+  symbol: string; // Will use model_name or variant_name as symbol
+  market_cap: number; // Will use min_price_usd as market_cap for sizing
+  current_price: number; // Will use min_price_usd as current_price
+  price_change_percentage_24h?: number; // Simulated or calculated if available from API
+  isBot?: boolean; // For the special bot bubble
 }
 
 const App = () => {
+    // State to store all gift models fetched from /api/gifts
     const [giftsData, setGiftsData] = useState<Gift[]>([]);
+    // State to store the overall minimum gift fetched from /api/min_gift
+    const [overallMinGift, setOverallMinGift] = useState<Gift | null>(null);
+    // State for TON price from the API
+    const [tonPrice, setTonPrice] = useState<number | null>(null);
+    // Loading state for data fetching
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    // Error state for displaying fetch errors
+    const [error, setError] = useState<string | null>(null);
+    // UI states (filters, sort method, selected bubble)
     const [isFilterOpen, setIsFilterOpen] = useState(false);
-    const [selectedGifts, setSelectedGifts] = useState<string[]>([]);
-    const [sortMethod, setSortMethod] = useState<'random' | 'price'>('random');
-    const [selectedTimeframe, setSelectedTimeframe] = useState('Day');
-    const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null);
+    const [selectedGifts, setSelectedGifts] = useState<string[]>([]); // Tracks selected gift IDs for filtering
+    const [sortMethod, setSortMethod] = useState<'random' | 'price'>('random'); // 'price' will map to 'marketCap'
+    const [selectedTimeframe, setSelectedTimeframe] = useState('Day'); // For potential future use
+    const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null); // Data for the modal
 
-    // دالة جلب بيانات الهدايا
+    // Define your API base URL
+    // IMPORTANT: Ensure your physbubble-bot API is running on this address (e.g., http://localhost:8000)
+    const API_BASE_URL = 'http://localhost:8000'; 
+
+    // Function to fetch gift data from your FastAPI backend
     const fetchGiftsData = async () => {
         try {
-            const response = await fetch('https://YOUR_API_DOMAIN/api/gifts');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            setLoading(true);
+            setError(null);
+
+            // Fetch overall minimum gift (for the special bubble or display)
+            const minGiftResponse = await fetch(`${API_BASE_URL}/api/min_gift?pretty=true`);
+            if (!minGiftResponse.ok) {
+                throw new Error(`HTTP error! status: ${minGiftResponse.status} from /api/min_gift`);
             }
-            const data = await response.json();
+            const minGiftJson = await minGiftResponse.json();
             
-            // تحويل البيانات لتتناسب مع هيكل التطبيق
-            const formattedData = data.map((gift: any, index: number) => ({
-                id: `gift-${index}`,
-                name: gift.name,
-                price_ton: gift.price_ton,
-                price_usd: gift.price_usd,
-                // إضافة تغير سعر عشوائي لمحاكاة الوظيفة الأصلية
+            // Map min_price_gift data to the Gift interface structure
+            if (minGiftJson.min_price_gift) {
+                 setOverallMinGift({
+                    id: minGiftJson.min_price_gift.id || 'overall_min', // Use existing ID or default
+                    name: minGiftJson.min_price_gift.name,
+                    model_name: minGiftJson.min_price_gift.name, // Use name for model_name
+                    min_price_ton: minGiftJson.min_price_gift.price_ton,
+                    min_price_usd: minGiftJson.min_price_gift.price_usd,
+                    image: minGiftJson.min_price_gift.image,
+                    // Map to BubbleCanvas expected props
+                    symbol: minGiftJson.min_price_gift.name.substring(0, 3).toUpperCase(), // Short symbol
+                    market_cap: minGiftJson.min_price_gift.price_usd,
+                    current_price: minGiftJson.min_price_gift.price_usd,
+                    // Simulate price change for min gift (or get from API if available)
+                    price_change_percentage_24h: Math.random() > 0.5 ? Math.random() * 10 : Math.random() * -10
+                });
+            }
+            setTonPrice(minGiftJson.ton_price);
+
+
+            // Fetch all gift models
+            // Using 'min_price_usd_asc' as the default sort for initial display
+            const allGiftsResponse = await fetch(`${API_BASE_URL}/api/gifts?sort_by=min_price_usd_asc&pretty=true`);
+            if (!allGiftsResponse.ok) {
+                throw new Error(`HTTP error! status: ${allGiftsResponse.status} from /api/gifts`);
+            }
+            const allGiftsJson = await allGiftsResponse.json();
+            
+            // Transform fetched data to match the 'Gift' interface required by BubbleCanvas
+            const transformedGifts: Gift[] = allGiftsJson.map((gift: any) => ({
+                id: gift.model_name, // Using model_name as unique ID for filtering/selection
+                model_name: gift.model_name,
+                name: gift.model_name, // BubbleCanvas expects 'name'
+                min_price_ton: gift.min_price_ton,
+                min_price_usd: gift.min_price_usd,
+                image: gift.image,
+                // Map to BubbleCanvas expected props
+                symbol: gift.model_name.substring(0, 3).toUpperCase(), // Example: first 3 chars as symbol
+                market_cap: gift.min_price_usd, // Use USD price for market cap simulation
+                current_price: gift.min_price_usd, // Use USD price as current price
+                // Simulate price change for now, until your bot API provides it
                 price_change_percentage_24h: Math.random() > 0.5 ? 
                     Math.random() * 10 : 
                     Math.random() * -10
             }));
             
-            setGiftsData(formattedData);
-            setSelectedGifts(formattedData.map(g => g.id));
-            setError(null);
-        } catch (err) {
-            setError('فشل في جلب بيانات الهدايا. يرجى المحاولة لاحقاً.');
-            console.error("Fetch error:", err);
+            setGiftsData(transformedGifts);
+            // Initially select all gifts for display
+            setSelectedGifts(transformedGifts.map(g => g.id));
+            
+        } catch (err: any) {
+            console.error("Failed to fetch gift data:", err);
+            setError(`فشل في جلب بيانات الهدايا: ${err.message}. يرجى التأكد من تشغيل API الخاص بك على ${API_BASE_URL}`);
         } finally {
             setLoading(false);
         }
     };
 
+    // Effect hook to fetch data on component mount and set up auto-refresh
     useEffect(() => {
         fetchGiftsData();
-        // التحديث التلقائي كل 5 دقائق (300000 مللي ثانية)
+        // Auto-refresh data every 5 minutes (300000 milliseconds)
         const interval = setInterval(fetchGiftsData, 300000);
-        return () => clearInterval(interval);
-    }, []);
+        return () => clearInterval(interval); // Cleanup on unmount
+    }, []); // Empty dependency array means this runs once on mount
 
+    // Handler for filtering gifts (checkboxes)
     const handleFilterChange = (giftId: string) => {
-        if (selectedGifts.includes(giftId)) {
-            setSelectedGifts(selectedGifts.filter(id => id !== giftId));
-        } else {
-            setSelectedGifts([...selectedGifts, giftId]);
-        }
+        setSelectedGifts(prevSelected => 
+            prevSelected.includes(giftId)
+                ? prevSelected.filter(id => id !== giftId)
+                : [...prevSelected, giftId]
+        );
     };
 
+    // Handler for timeframe change (currently not affecting data, but can be expanded)
     const handleTimeframeChange = (timeframe: string) => {
         setSelectedTimeframe(timeframe);
-        // يمكنك إضافة منطق إضافي هنا حسب الفترة الزمنية
     };
 
-    // حساب عدد الهدايا الصاعدة والهابطة (بناء على تغير السعر المحاكى)
+    // Calculate up/down counts based on price change percentage
     const upCount = giftsData.filter(d => d.price_change_percentage_24h && d.price_change_percentage_24h > 0).length;
     const downCount = giftsData.filter(d => d.price_change_percentage_24h && d.price_change_percentage_24h < 0).length;
 
+    // Loading and Error states UI
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen bg-gray-900 text-gray-100 font-sans">
                 <style>
                     {`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');`}
                 </style>
-                <p className="text-xl">جاري تحميل...</p>
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-300 mx-auto"></div>
+                    <p className="mt-4 text-xl">جاري تحميل بيانات الهدايا...</p>
+                    <p className="text-sm text-gray-300">تأكد من تشغيل API الخاص بك على {API_BASE_URL}</p>
+                </div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="flex items-center justify-center h-screen bg-gray-900 text-red-500 font-sans">
+            <div className="flex items-center justify-center h-screen bg-red-800 text-white font-sans p-4">
                 <style>
                     {`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');`}
                 </style>
-                <p className="text-xl">{error}</p>
+                 <div className="text-center bg-red-900 p-6 rounded-lg shadow-xl">
+                    <p className="text-xl font-bold mb-4">خطأ في جلب البيانات:</p>
+                    <p>{error}</p>
+                    <p className="mt-4 text-sm text-red-200">
+                        الرجاء التأكد من أن الـ API الخاص بـ physbubble-bot يعمل ويستجيب على العنوان:
+                        <br/><code className="text-yellow-200">{API_BASE_URL}</code>
+                    </p>
+                </div>
             </div>
         );
     }
@@ -113,7 +186,7 @@ const App = () => {
                 `}
             </style>
             
-            {/* شريط التحكم (يبقى كما هو مع تغيير البيانات فقط) */}
+            {/* Control Bar */}
             <div className="w-full flex items-center justify-between p-1 bg-gray-800 rounded-lg shadow-lg border border-gray-700 mb-2">
                 <div className="flex items-center space-x-1 md:space-x-2">
                     <div className="relative">
@@ -169,31 +242,50 @@ const App = () => {
                     >
                         All
                     </button>
+                    {/* Changed button text to be more relevant to 'Market Cap' sort */}
                     <button 
                         className={`font-bold py-1 px-2 rounded-lg text-xs md:text-sm transition-colors duration-200 ${sortMethod === 'price' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
                         onClick={() => setSortMethod(sortMethod === 'price' ? 'random' : 'price')}
                     >
-                        Market Cap
+                        {sortMethod === 'price' ? 'Default Sort' : 'Sort by Price'} 
                     </button>
                 </div>
             </div>
             
-            {/* مكون الفقاعات مع تعديل البيانات المرسلة */}
+            {/* Bubble Canvas Component - Pass the transformed data */}
+            {/* The 'data' prop here needs to be named 'cryptoData' as per BubbleCanvas.tsx */}
             <BubbleCanvas
-                data={giftsData.filter(gift => selectedGifts.includes(gift.id))}
+                cryptoData={giftsData.filter(gift => selectedGifts.includes(gift.id))} // Use cryptoData for the prop name
                 loading={loading}
-                sortMethod={sortMethod}
+                sortMethod={sortMethod === 'price' ? 'marketCap' : 'random'} // Map 'price' to 'marketCap' for BubbleCanvas
                 onBubbleClick={setSelectedBubbleData}
-                isCrypto={false} // إضافة خاصية لتمييز نوع البيانات
+                // isCrypto={false} // This prop is not used in the updated BubbleCanvas.tsx, can be removed
             />
 
-            {/* نافذة التفاصيل */}
+            {/* Gift Modal Component - Pass the selected bubble data */}
             {selectedBubbleData && (
                 <GiftModal 
-                    giftData={selectedBubbleData} 
+                    bubbleData={selectedBubbleData} // Use bubbleData for the prop name
                     onClose={() => setSelectedBubbleData(null)} 
                 />
             )}
+
+            {/* Display TON Price and Overall Min Gift in a dedicated section */}
+            <div className="flex flex-col sm:flex-row justify-around items-center bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-3 mt-2 text-sm md:text-base">
+                {tonPrice !== null && (
+                    <div className="text-center flex-1 p-1">
+                        <p className="text-gray-400">سعر TON الحالي:</p>
+                        <p className="text-green-400 font-bold text-lg">${tonPrice.toFixed(4)}</p>
+                    </div>
+                )}
+                {overallMinGift && (
+                    <div className="text-center flex-1 p-1 mt-2 sm:mt-0">
+                        <p className="text-gray-400">أرخص هدية:</p>
+                        <p className="text-yellow-400 font-bold text-lg">{overallMinGift.name}</p>
+                        <p className="text-blue-300">({overallMinGift.min_price_usd.toFixed(2)} USD)</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

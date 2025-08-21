@@ -49,43 +49,43 @@ const App = () => {
     // Function to fetch gift data from your FastAPI backend
     const fetchGiftsData = async () => {
         try {
-            setLoading(true);
-            setError(null);
+            setLoading(true); // Start loading
 
-            // Fetch overall minimum gift (for the special bubble or display)
-            const minGiftResponse = await fetch(`${API_BASE_URL}/api/min_gift?pretty=true`);
+            // Use Promise.all to fetch both API endpoints concurrently
+            const [minGiftResponse, allGiftsResponse] = await Promise.all([
+                fetch(`${API_BASE_URL}/api/min_gift?pretty=true`),
+                fetch(`${API_BASE_URL}/api/gifts?sort_by=min_price_usd_asc&pretty=true`)
+            ]);
+
+            // Handle minGiftResponse
             if (!minGiftResponse.ok) {
                 throw new Error(`HTTP error! status: ${minGiftResponse.status} from /api/min_gift`);
             }
             const minGiftJson = await minGiftResponse.json();
-            
-            // Map min_price_gift data to the Gift interface structure
+            console.log('API /api/min_gift response:', minGiftJson); // Log API response
+
             if (minGiftJson.min_price_gift) {
                  setOverallMinGift({
-                    id: minGiftJson.min_price_gift.id || 'overall_min', // Use existing ID or default
+                    id: minGiftJson.min_price_gift.id || 'overall_min',
                     name: minGiftJson.min_price_gift.name,
-                    model_name: minGiftJson.min_price_gift.name, // Use name for model_name
+                    model_name: minGiftJson.min_price_gift.name,
                     min_price_ton: minGiftJson.min_price_gift.price_ton,
                     min_price_usd: minGiftJson.min_price_gift.price_usd,
                     image: minGiftJson.min_price_gift.image,
-                    // Map to BubbleCanvas expected props
-                    symbol: minGiftJson.min_price_gift.name.substring(0, 3).toUpperCase(), // Short symbol
+                    symbol: minGiftJson.min_price_gift.name.substring(0, 3).toUpperCase(),
                     market_cap: minGiftJson.min_price_gift.price_usd,
                     current_price: minGiftJson.min_price_gift.price_usd,
-                    // Simulate price change for min gift (or get from API if available)
                     price_change_percentage_24h: Math.random() > 0.5 ? Math.random() * 10 : Math.random() * -10
                 });
             }
             setTonPrice(minGiftJson.ton_price);
 
-
-            // Fetch all gift models
-            // Using 'min_price_usd_asc' as the default sort for initial display
-            const allGiftsResponse = await fetch(`${API_BASE_URL}/api/gifts?sort_by=min_price_usd_asc&pretty=true`);
+            // Handle allGiftsResponse
             if (!allGiftsResponse.ok) {
                 throw new Error(`HTTP error! status: ${allGiftsResponse.status} from /api/gifts`);
             }
             const allGiftsJson = await allGiftsResponse.json();
+            console.log('API /api/gifts response:', allGiftsJson); // Log API response
             
             // Transform fetched data to match the 'Gift' interface required by BubbleCanvas
             const transformedGifts: Gift[] = allGiftsJson.map((gift: any) => ({
@@ -95,11 +95,9 @@ const App = () => {
                 min_price_ton: gift.min_price_ton,
                 min_price_usd: gift.min_price_usd,
                 image: gift.image,
-                // Map to BubbleCanvas expected props
-                symbol: gift.model_name.substring(0, 3).toUpperCase(), // Example: first 3 chars as symbol
-                market_cap: gift.min_price_usd, // Use USD price for market cap simulation
-                current_price: gift.min_price_usd, // Use USD price as current price
-                // Simulate price change for now, until your bot API provides it
+                symbol: gift.model_name.substring(0, 3).toUpperCase(),
+                market_cap: gift.min_price_usd,
+                current_price: gift.min_price_usd,
                 price_change_percentage_24h: Math.random() > 0.5 ? 
                     Math.random() * 10 : 
                     Math.random() * -10
@@ -108,12 +106,16 @@ const App = () => {
             setGiftsData(transformedGifts);
             // Initially select all gifts for display
             setSelectedGifts(transformedGifts.map(g => g.id));
-            
+            setError(null); // Clear any previous errors
+
+            console.log('Transformed Gifts Data:', transformedGifts);
+            console.log('Selected Gifts IDs:', transformedGifts.map(g => g.id));
+
         } catch (err: any) {
             console.error("Failed to fetch gift data:", err);
             setError(`فشل في جلب بيانات الهدايا: ${err.message}. يرجى التأكد من تشغيل API الخاص بك على ${API_BASE_URL}`);
         } finally {
-            setLoading(false);
+            setLoading(false); // End loading after all fetches (success or error)
         }
     };
 
@@ -242,7 +244,6 @@ const App = () => {
                     >
                         All
                     </button>
-                    {/* Changed button text to be more relevant to 'Market Cap' sort */}
                     <button 
                         className={`font-bold py-1 px-2 rounded-lg text-xs md:text-sm transition-colors duration-200 ${sortMethod === 'price' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
                         onClick={() => setSortMethod(sortMethod === 'price' ? 'random' : 'price')}
@@ -253,19 +254,18 @@ const App = () => {
             </div>
             
             {/* Bubble Canvas Component - Pass the transformed data */}
-            {/* The 'data' prop here needs to be named 'cryptoData' as per BubbleCanvas.tsx */}
             <BubbleCanvas
-                cryptoData={giftsData.filter(gift => selectedGifts.includes(gift.id))} // Use cryptoData for the prop name
+                cryptoData={giftsData.filter(gift => selectedGifts.includes(gift.id))}
                 loading={loading}
-                sortMethod={sortMethod === 'price' ? 'marketCap' : 'random'} // Map 'price' to 'marketCap' for BubbleCanvas
+                selectedCryptos={selectedGifts} // Explicitly pass selectedCryptos to BubbleCanvas
+                sortMethod={sortMethod === 'price' ? 'marketCap' : 'random'}
                 onBubbleClick={setSelectedBubbleData}
-                // isCrypto={false} // This prop is not used in the updated BubbleCanvas.tsx, can be removed
             />
 
             {/* Gift Modal Component - Pass the selected bubble data */}
             {selectedBubbleData && (
                 <GiftModal 
-                    bubbleData={selectedBubbleData} // Use bubbleData for the prop name
+                    bubbleData={selectedBubbleData}
                     onClose={() => setSelectedBubbleData(null)} 
                 />
             )}
@@ -282,7 +282,7 @@ const App = () => {
                     <div className="text-center flex-1 p-1 mt-2 sm:mt-0">
                         <p className="text-gray-400">أرخص هدية:</p>
                         <p className="text-yellow-400 font-bold text-lg">{overallMinGift.name}</p>
-                        <p className="text-blue-300">({overallMinGift.min_price_usd.toFixed(2)} USD)</p>
+                        <p className="text-blue-300">(${overallMinGift.min_price_usd.toFixed(2)} USD)</p>
                     </div>
                 )}
             </div>

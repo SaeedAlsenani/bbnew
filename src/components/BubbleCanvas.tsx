@@ -64,15 +64,20 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
 
         // Do not proceed with D3 simulation if data is not loaded or dimensions are invalid (0x0)
         // Robust check: Ensure cryptoData is an array and not empty, and dimensions are valid.
+        console.log('BubbleCanvas Effect - cryptoData:', cryptoData);
+        console.log('BubbleCanvas Effect - loading:', loading);
+        console.log('BubbleCanvas Effect - selectedCryptos:', selectedCryptos);
+        console.log('BubbleCanvas Effect - dimensions:', dimensions);
+
         if (!Array.isArray(cryptoData) || cryptoData.length === 0 || loading || width === 0 || height === 0 || !svgRef.current) {
             if (simulationRef.current) {
                 simulationRef.current.stop();
             }
-            console.log("BubbleCanvas: D3 simulation deferred due to invalid data/dimensions.");
+            console.log("BubbleCanvas: D3 simulation deferred due to invalid data/dimensions or loading state.");
             return;
         }
 
-        console.log("BubbleCanvas: Valid dimensions. Starting D3 simulation.");
+        console.log("BubbleCanvas: Valid dimensions and data. Starting D3 simulation.");
 
         // Stop the old simulation if it exists before creating a new one
         if (simulationRef.current) {
@@ -82,7 +87,10 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
         const svg = d3.select(svgRef.current);
         svg.selectAll('*').remove(); // Clear previous SVG elements
 
+        // Filter data based on selectedCryptos
         const filteredCryptoData = cryptoData.filter(d => selectedCryptos.includes(d.id));
+        console.log('BubbleCanvas: filteredCryptoData (after selection):', filteredCryptoData);
+
 
         let sortedData = [...filteredCryptoData];
         // Note: Sorting logic remains here as it affects bubble data preparation
@@ -91,6 +99,7 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
         if (sortMethod === 'marketCap') {
             sortedData.sort((a, b) => b.market_cap - a.market_cap);
         }
+        console.log('BubbleCanvas: sortedData (after sorting):', sortedData);
 
         // --- IMPORTANT: Add this check before d3.max and sizeScale ---
         // This prevents TypeError if sortedData becomes empty after filtering
@@ -105,11 +114,16 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
         // --- End of check ---
 
         const maxMarketCap = d3.max(sortedData, d => d.market_cap);
+        console.log('BubbleCanvas: maxMarketCap:', maxMarketCap);
+
+        // Ensure maxMarketCap is not zero or negative for a valid scale domain
         const sizeScale = d3.scaleSqrt()
-            .domain([0, maxMarketCap])
+            .domain([0, maxMarketCap > 0 ? maxMarketCap : 1]) // Prevent domain from being [0,0] if maxMarketCap is 0
             .range([10, Math.min(width, height) / 8]);
 
         let nodes = sortedData.map(d => ({ ...d, r: sizeScale(d.market_cap) }));
+        console.log('BubbleCanvas: Nodes for simulation:', nodes);
+
 
         // --- Bot Bubble Logic ---
         // Calculate bot bubble radius based on the largest crypto bubble
@@ -132,6 +146,7 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
                 current_price: 0,
                 price_change_percentage_24h: 0,
             };
+            console.log('BubbleCanvas: Bot bubble data created/updated:', botBubbleDataRef.current);
         }
 
         // Add the bot bubble to the nodes array if it exists
@@ -260,4 +275,3 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
 };
 
 export default BubbleCanvas;
-

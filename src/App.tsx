@@ -1,38 +1,69 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import BubbleCanvas from './components/BubbleCanvas';
 import GiftModal from './components/GiftModal';
 
 // SVG Icons (kept as is)
-const LuEye = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>;
-const LuChevronUp = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
-const LuChevronDown = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
+const LuEye = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>;
+const LuChevronUp = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
+const LuChevronDown = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
 
 // واجهة Gift الرئيسية - تستخدم min_price_ton و min_price_usd
 interface Gift {
-  id: string;
+  id: string; // قد يكون model_name أو variant_id
   model_name: string;
-  variant_name?: string;
-  min_price_ton: number; // التسمية المستخدمة في الواجهة الرئيسية
-  min_price_usd: number; // التسمية المستخدمة في الواجهة الرئيسية
+  variant_name?: string; // اسم النسخة (مثلاً Plush Pepe #123)
+  min_price_ton: number;
+  min_price_usd: number;
   image: string;
-  name: string;
-  symbol: string;
-  market_cap: number;
-  current_price: number;
-  price_change_percentage_24h?: number;
+  // خصائص إضافية مطلوبة لـ BubbleCanvas
+  name: string; // يستخدم لعرض اسم الهدية/النموذج
+  symbol: string; // يستخدم لرمز العرض (أول 3 أحرف من الاسم)
+  market_cap: number; // يستخدم لحجم الفقاعة
+  current_price: number; // يستخدم لسعر العرض
+  price_change_percentage_24h?: number; // يستخدم لتغيير السعر
   isBot?: boolean;
 }
 
-// واجهة للاستجابة من /min_gift - تستخدم price_ton و price_usd
-interface MinGiftResponse {
+// واجهة لاستجابة MinGiftResponse من نقطة النهاية /api/min_gift
+interface MinGiftApiResponse {
   min_price_gift?: {
-    id: string;
-    name: string;
-    price_ton: number; // التسمية المستخدمة في استجابة API
-    price_usd: number; // التسمية المستخدمة في استجابة API
-    image: string;
+    id?: string; // قد يكون variant_id
+    name?: string; // اسم النسخة (مثلاً Plush Pepe #123)
+    price_ton: number;
+    price_usd: number;
+    image?: string;
   };
   ton_price: number;
+  timestamp: number;
+  last_updated: string;
+  _sort_order: string;
+  total_models: number;
+  success_rate: string;
+}
+
+// واجهة لاستجابة AllGiftModelsResponse من نقطة النهاية /api/models
+interface AllGiftModelsApiResponse {
+  gift_models_min_prices: {
+    model_name: string;
+    min_price_ton: number;
+    min_price_usd: number;
+    image?: string;
+    variant_id?: string;
+    variant_name?: string;
+    is_valid: boolean;
+  }[];
+  ton_price: number;
+  timestamp: number;
+  last_updated: string;
+  _sort_order: string;
+  total_models: number;
+  success_rate: string;
+}
+
+// واجهة لـ TargetItem لإرسالها في جسم الطلب
+interface TargetItem {
+  collection: string;
+  model?: string;
 }
 
 const App = () => {
@@ -43,86 +74,201 @@ const App = () => {
     const [error, setError] = useState<string | null>(null);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [selectedGifts, setSelectedGifts] = useState<string[]>([]);
-    const [sortMethod, setSortMethod] = useState<'random' | 'price'>('random');
+    const [sortMethod, setSortMethod] = useState<'random' | 'price'>('random'); // 'price' for min_price_usd_asc
     const [selectedTimeframe, setSelectedTimeframe] = useState('Day');
     const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null);
 
-    const API_BASE_URL = '/api';
+    const API_BASE_URL = 'http://127.0.0.1:8000/api'; // تحديث: يجب أن يتطابق مع عنوان Uvicorn/FastAPI
 
-    const fetchGiftsData = async () => {
+    // قائمة افتراضية بالأهداف
+    // يمكنك تعديل هذه القائمة لتحديد المجموعات والنماذج التي تريد جلب بياناتها
+       const defaultTargetItems: TargetItem[] = useMemo(() => [
+    { "collection": "Plush Pepe" },
+    { "collection": "Eternal Candle" },
+    { "collection": "Snoop Dogg" },
+    { "collection": "Jingle Bells" },
+    { "collection": "Pet Snake" },
+    { "collection": "Tama Gadget" },
+    { "collection": "Lunar Snake" },
+    { "collection": "Snow Mittens" },
+    { "collection": "Witch Hat" },
+    { "collection": "Lol Pop" },
+    { "collection": "Spy Agaric" },
+    { "collection": "Bunny Muffin" },
+    { "collection": "Low Rider" },
+    { "collection": "Whip Cupcake" },
+    { "collection": "Berry Box" },
+    { "collection": "Swag Bag" },
+    { "collection": "Precious Peach" },
+    { "collection": "Light Sword" },
+    { "collection": "Durov's Cap" },
+    { "collection": "Bow Tie" },
+    { "collection": "Candy Cane" },
+    { "collection": "Heroic Helmet" },
+    { "collection": "Sleigh Bell" },
+    { "collection": "Snake Box" },
+    { "collection": "Neko Helmet" },
+    { "collection": "Diamond Ring" },
+    { "collection": "Sakura Flower" },
+    { "collection": "Westside Sign" },
+    { "collection": "Evil Eye" },
+    { "collection": "Record Player" },
+    { "collection": "Skull Flower" },
+    { "collection": "Easter Egg" },
+    { "collection": "B-Day Candle" },
+    { "collection": "Desk Calendar" },
+    { "collection": "Star Notepad" },
+    { "collection": "Joyful Bundle" },
+    { "collection": "Plush Pepe" },
+    { "collection": "Eternal Candle" },
+    { "collection": "Snoop Dogg" },
+    { "collection": "Sharp Tongue" },
+    { "collection": "Snow Globe" },
+    { "collection": "Holiday Drink" },
+    { "collection": "Flying Broom" },
+    { "collection": "Big Year" },
+    { "collection": "Hypno Lollipop" },
+    { "collection": "Genie Lamp" },
+    { "collection": "Bonded Ring" },
+    { "collection": "Spiced Wine" },
+    { "collection": "Snoop Cigar" },
+    { "collection": "Xmas Stocking" },
+    { "collection": "Homemade Cake" },
+    { "collection": "Toy Bear" },
+    { "collection": "Vintage Cigar" },
+    { "collection": "Signet Ring" },
+    { "collection": "Gem Signet" },
+    { "collection": "Lush Bouquet" },
+    { "collection": "Santa Hat" },
+    { "collection": "Winter Wreath" },
+    { "collection": "Nail Bracelet" },
+    { "collection": "Ginger Cookie" },
+    { "collection": "Perfume Bottle" },
+    { "collection": "Crystal Ball" },
+    { "collection": "Mini Oscar" },
+    { "collection": "Jelly Bunny" },
+    { "collection": "Jester Hat" },
+    { "collection": "Cookie Heart" },
+    { "collection": "Jack-in-the-Box" },
+    { "collection": "Hanging Star" },
+    { "collection": "Trapped Heart" },
+    { "collection": "Heart Locket" },
+    { "collection": "Magic Potion" },
+    { "collection": "Mad Pumpkin" },
+    { "collection": "Party Sparkler" },
+    { "collection": "Cupid Charm" },
+    { "collection": "Kissed Frog" },
+    { "collection": "Loot Bag" },
+    { "collection": "Eternal Rose" },
+    { "collection": "Love Candle" },
+    { "collection": "Electric Skull" },
+    { "collection": "Valentine Box" },
+    { "collection": "Hex Pot" },
+    { "collection": "Swiss Watch" },
+    { "collection": "Top Hat" },
+    { "collection": "Scared Cat" },
+    { "collection": "Love Potion" },
+    { "collection": "Astral Shard" },
+    { "collection": "Ion Gem" },
+    { "collection": "Voodoo Doll" },
+    { "collection": "Restless Jar" }
+], []);
+
+    const fetchGiftsData = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
 
-            const [minGiftResponse, allGiftsResponse] = await Promise.all([
-                fetch(`${API_BASE_URL}/min_gift?pretty=true`),
-                fetch(`${API_BASE_URL}/gifts?sort_by=min_price_usd_asc&pretty=true`)
-            ]);
+            // إنشاء حمولة الطلب لجميع نقاط النهاية
+            const requestBody = JSON.stringify(defaultTargetItems);
+            const requestHeaders = {
+                'Content-Type': 'application/json',
+            };
+
+            // 1. جلب بيانات أرخص هدية شاملة من /api/min_gift (الآن POST)
+            const minGiftResponse = await fetch(`${API_BASE_URL}/min_gift?pretty=true`, {
+                method: 'POST',
+                headers: requestHeaders,
+                body: requestBody,
+            });
+
+            // 2. جلب جميع نماذج الهدايا من /api/models (الآن POST)
+            const allGiftsResponse = await fetch(`${API_BASE_URL}/models?sort_by=min_price_usd_asc&pretty=true`, {
+                method: 'POST',
+                headers: requestHeaders,
+                body: requestBody,
+            });
 
             if (!minGiftResponse.ok || !allGiftsResponse.ok) {
-                throw new Error(`خطأ HTTP! الحالة: ${minGiftResponse.status}/${allGiftsResponse.status}`);
+                const minGiftError = await minGiftResponse.text();
+                const allGiftsError = await allGiftsResponse.text();
+                console.error("Min Gift API Error:", minGiftError);
+                console.error("All Gifts API Error:", allGiftsError);
+                throw new Error(`خطأ HTTP! حالة /min_gift: ${minGiftResponse.status}, حالة /models: ${allGiftsResponse.status}`);
             }
 
-            // معالجة استجابة min_gift - نستخدم الواجهة الجديدة
-            const minGiftJson: MinGiftResponse = await minGiftResponse.json();
+            // معالجة استجابة min_gift
+            const minGiftJson: MinGiftApiResponse = await minGiftResponse.json();
             console.log('API /min_gift response:', minGiftJson);
 
-            if (!minGiftJson || !minGiftJson.min_price_gift) {
-                throw new Error('تنسيق استجابة غير صالح من API');
-            }
-
-            if (minGiftJson.min_price_gift) {
-                 // تحويل البيانات من price_ton/price_usd إلى min_price_ton/min_price_usd
-                 setOverallMinGift({
+            if (minGiftJson && minGiftJson.min_price_gift) {
+                // تحويل البيانات من هيكل API إلى واجهة Gift الخاصة بنا
+                setOverallMinGift({
                     id: minGiftJson.min_price_gift.id || 'overall_min',
-                    name: minGiftJson.min_price_gift.name,
-                    model_name: minGiftJson.min_price_gift.name,
-                    min_price_ton: minGiftJson.min_price_gift.price_ton, // تحويل price_ton إلى min_price_ton
-                    min_price_usd: minGiftJson.min_price_gift.price_usd, // تحويل price_usd إلى min_price_usd
-                    image: minGiftJson.min_price_gift.image,
-                    symbol: minGiftJson.min_price_gift.name.substring(0, 3).toUpperCase(),
+                    name: minGiftJson.min_price_gift.name || 'أرخص هدية',
+                    model_name: minGiftJson.min_price_gift.name || 'أرخص هدية', // قد تحتاج لتحديد model_name بشكل أفضل
+                    min_price_ton: minGiftJson.min_price_gift.price_ton,
+                    min_price_usd: minGiftJson.min_price_gift.price_usd,
+                    image: minGiftJson.min_price_gift.image || 'https://placehold.co/60x60/333/FFF?text=Gift',
+                    symbol: (minGiftJson.min_price_gift.name || 'ARG').substring(0, 3).toUpperCase(),
                     market_cap: minGiftJson.min_price_gift.price_usd,
                     current_price: minGiftJson.min_price_gift.price_usd,
                     price_change_percentage_24h: Math.random() > 0.5 ? Math.random() * 10 : Math.random() * -10
                 });
+            } else {
+                setOverallMinGift(null);
             }
             setTonPrice(minGiftJson.ton_price);
 
-            // معالجة استجابة gifts - البيانات هنا تستخدم min_price_ton و min_price_usd بالفعل
-            const allGiftsJson = await allGiftsResponse.json();
-            console.log('API /gifts response:', allGiftsJson);
+            // معالجة استجابة models
+            const allGiftsJson: AllGiftModelsApiResponse = await allGiftsResponse.json();
+            console.log('API /models response:', allGiftsJson);
             
-            const transformedGifts: Gift[] = allGiftsJson.map((gift: any) => ({
-                id: gift.model_name,
-                model_name: gift.model_name,
-                name: gift.model_name,
-                min_price_ton: gift.min_price_ton, // بالفعل min_price_ton
-                min_price_usd: gift.min_price_usd, // بالفعل min_price_usd
-                image: gift.image,
-                symbol: gift.model_name.substring(0, 3).toUpperCase(),
-                market_cap: gift.min_price_usd,
-                current_price: gift.min_price_usd,
-                price_change_percentage_24h: Math.random() > 0.5 ? 
-                    Math.random() * 10 : 
-                    Math.random() * -10
-            }));
+            const transformedGifts: Gift[] = allGiftsJson.gift_models_min_prices
+                .filter(gift => gift.is_valid) // تصفية الهدايا غير الصالحة
+                .map((gift: any) => ({
+                    id: gift.variant_id || gift.model_name, // استخدام variant_id أو model_name كـ id
+                    model_name: gift.model_name,
+                    variant_name: gift.variant_name,
+                    name: gift.variant_name || gift.model_name, // الأفضل عرض variant_name إن وجد
+                    min_price_ton: gift.min_price_ton,
+                    min_price_usd: gift.min_price_usd,
+                    image: gift.image || 'https://placehold.co/60x60/333/FFF?text=Gift',
+                    symbol: gift.model_name.substring(0, 3).toUpperCase(),
+                    market_cap: gift.min_price_usd,
+                    current_price: gift.min_price_usd,
+                    price_change_percentage_24h: Math.random() > 0.5 ? 
+                        Math.random() * 10 : 
+                        Math.random() * -10
+                }));
             
             setGiftsData(transformedGifts);
+            // تحديد الهدايا المختارة لجميع الهدايا الصالحة تلقائياً
             setSelectedGifts(transformedGifts.map(g => g.id));
 
         } catch (err: any) {
-            console.error("Failed to fetch gift data:", err);
+            console.error("فشل في جلب بيانات الهدايا:", err);
             setError(`فشل في جلب بيانات الهدايا: ${err.message}. يرجى التأكد من تشغيل API الخاص بك على ${API_BASE_URL}`);
         } finally {
             setLoading(false);
         }
-    };
+    }, [defaultTargetItems, API_BASE_URL]); // إضافة defaultTargetItems و API_BASE_URL كـ dependencies
 
     useEffect(() => {
         fetchGiftsData();
-        const interval = setInterval(fetchGiftsData, 300000);
+        const interval = setInterval(fetchGiftsData, 300000); // 5 دقائق
         return () => clearInterval(interval);
-    }, []);
+    }, [fetchGiftsData]); // جعل fetchGiftsData dependency للـ useEffect
 
     const filteredGifts = useMemo(() => 
         giftsData.filter(gift => selectedGifts.includes(gift.id)),

@@ -76,103 +76,104 @@ const App = () => {
     const [selectedGifts, setSelectedGifts] = useState<string[]>([]);
     const [sortMethod, setSortMethod] = useState<'random' | 'price'>('random'); // 'price' for min_price_usd_asc
     const [selectedTimeframe, setSelectedTimeframe] = useState('Day');
-    const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null);
+    const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(selectedBubbleData); // تم تعيين القيمة الافتراضية بشكل صحيح
 
-    const API_BASE_URL = '/api'; // تحديث: يجب أن يتطابق مع عنوان Uvicorn/FastAPI
+    // تغيير API_BASE_URL ليكون مساراً نسبياً ليتم التعامل معه بواسطة vercel.json
+    const API_BASE_URL = '/api'; 
 
     // قائمة افتراضية بالأهداف
     // يمكنك تعديل هذه القائمة لتحديد المجموعات والنماذج التي تريد جلب بياناتها
-       const defaultTargetItems: TargetItem[] = useMemo(() => [
-    { "collection": "Plush Pepe" },
-    { "collection": "Eternal Candle" },
-    { "collection": "Snoop Dogg" },
-    { "collection": "Jingle Bells" },
-    { "collection": "Pet Snake" },
-    { "collection": "Tama Gadget" },
-    { "collection": "Lunar Snake" },
-    { "collection": "Snow Mittens" },
-    { "collection": "Witch Hat" },
-    { "collection": "Lol Pop" },
-    { "collection": "Spy Agaric" },
-    { "collection": "Bunny Muffin" },
-    { "collection": "Low Rider" },
-    { "collection": "Whip Cupcake" },
-    { "collection": "Berry Box" },
-    { "collection": "Swag Bag" },
-    { "collection": "Precious Peach" },
-    { "collection": "Light Sword" },
-    { "collection": "Durov's Cap" },
-    { "collection": "Bow Tie" },
-    { "collection": "Candy Cane" },
-    { "collection": "Heroic Helmet" },
-    { "collection": "Sleigh Bell" },
-    { "collection": "Snake Box" },
-    { "collection": "Neko Helmet" },
-    { "collection": "Diamond Ring" },
-    { "collection": "Sakura Flower" },
-    { "collection": "Westside Sign" },
-    { "collection": "Evil Eye" },
-    { "collection": "Record Player" },
-    { "collection": "Skull Flower" },
-    { "collection": "Easter Egg" },
-    { "collection": "B-Day Candle" },
-    { "collection": "Desk Calendar" },
-    { "collection": "Star Notepad" },
-    { "collection": "Joyful Bundle" },
-    { "collection": "Plush Pepe" },
-    { "collection": "Eternal Candle" },
-    { "collection": "Snoop Dogg" },
-    { "collection": "Sharp Tongue" },
-    { "collection": "Snow Globe" },
-    { "collection": "Holiday Drink" },
-    { "collection": "Flying Broom" },
-    { "collection": "Big Year" },
-    { "collection": "Hypno Lollipop" },
-    { "collection": "Genie Lamp" },
-    { "collection": "Bonded Ring" },
-    { "collection": "Spiced Wine" },
-    { "collection": "Snoop Cigar" },
-    { "collection": "Xmas Stocking" },
-    { "collection": "Homemade Cake" },
-    { "collection": "Toy Bear" },
-    { "collection": "Vintage Cigar" },
-    { "collection": "Signet Ring" },
-    { "collection": "Gem Signet" },
-    { "collection": "Lush Bouquet" },
-    { "collection": "Santa Hat" },
-    { "collection": "Winter Wreath" },
-    { "collection": "Nail Bracelet" },
-    { "collection": "Ginger Cookie" },
-    { "collection": "Perfume Bottle" },
-    { "collection": "Crystal Ball" },
-    { "collection": "Mini Oscar" },
-    { "collection": "Jelly Bunny" },
-    { "collection": "Jester Hat" },
-    { "collection": "Cookie Heart" },
-    { "collection": "Jack-in-the-Box" },
-    { "collection": "Hanging Star" },
-    { "collection": "Trapped Heart" },
-    { "collection": "Heart Locket" },
-    { "collection": "Magic Potion" },
-    { "collection": "Mad Pumpkin" },
-    { "collection": "Party Sparkler" },
-    { "collection": "Cupid Charm" },
-    { "collection": "Kissed Frog" },
-    { "collection": "Loot Bag" },
-    { "collection": "Eternal Rose" },
-    { "collection": "Love Candle" },
-    { "collection": "Electric Skull" },
-    { "collection": "Valentine Box" },
-    { "collection": "Hex Pot" },
-    { "collection": "Swiss Watch" },
-    { "collection": "Top Hat" },
-    { "collection": "Scared Cat" },
-    { "collection": "Love Potion" },
-    { "collection": "Astral Shard" },
-    { "collection": "Ion Gem" },
-    { "collection": "Voodoo Doll" },
-    { "collection": "Restless Jar" }
-], []);
+    const defaultTargetItems: TargetItem[] = useMemo(() => [
+        { "collection": "Plush Pepe" },
+        { "collection": "Eternal Candle" },
+        { "collection": "Snoop Dogg" },
+        { "collection": "Jingle Bells" },
+        { "collection": "Pet Snake" },
+        { "collection": "Tama Gadget" },
+        { "collection": "Lunar Snake" },
+        { "collection": "Snow Mittens" },
+        { "collection": "Witch Hat" },
+        { "collection": "Lol Pop" },
+        { "collection": "Spy Agaric" },
+        { "collection": "Bunny Muffin" },
+        { "collection": "Low Rider" },
+        { "collection": "Whip Cupcake" },
+        { "collection": "Berry Box" },
+        { "collection": "Swag Bag" },
+        { "collection": "Precious Peach" },
+        { "collection": "Light Sword" },
+        { "collection": "Durov's Cap" },
+        { "collection": "Bow Tie" },
+        { "collection": "Candy Cane" },
+        { "collection": "Heroic Helmet" },
+        { "collection": "Sleigh Bell" },
+        { "collection": "Snake Box" },
+        { "collection": "Neko Helmet" },
+        { "collection": "Diamond Ring" },
+        { "collection": "Sakura Flower" },
+        { "collection": "Westside Sign" },
+        { "collection": "Evil Eye" },
+        { "collection": "Record Player" },
+        { "collection": "Skull Flower" },
+        { "collection": "Easter Egg" },
+        { "collection": "B-Day Candle" },
+        { "collection": "Desk Calendar" },
+        { "collection": "Star Notepad" },
+        { "collection": "Joyful Bundle" },
+        { "collection": "Plush Pepe" },
+        { "collection": "Eternal Candle" },
+        { "collection": "Snoop Dogg" },
+        { "collection": "Sharp Tongue" },
+        { "collection": "Snow Globe" },
+        { "collection": "Holiday Drink" },
+        { "collection": "Flying Broom" },
+        { "collection": "Big Year" },
+        { "collection": "Hypno Lollipop" },
+        { "collection": "Genie Lamp" },
+        { "collection": "Bonded Ring" },
+        { "collection": "Spiced Wine" },
+        { "collection": "Snoop Cigar" },
+        { "collection": "Xmas Stocking" },
+        { "collection": "Homemade Cake" },
+        { "collection": "Toy Bear" },
+        { "collection": "Vintage Cigar" },
+        { "collection": "Signet Ring" },
+        { "collection": "Gem Signet" },
+        { "collection": "Lush Bouquet" },
+        { "collection": "Santa Hat" },
+        { "collection": "Winter Wreath" },
+        { "collection": "Nail Bracelet" },
+        { "collection": "Ginger Cookie" },
+        { "collection": "Perfume Bottle" },
+        { "collection": "Crystal Ball" },
+        { "collection": "Mini Oscar" },
+        { "collection": "Jelly Bunny" },
+        { "collection": "Jester Hat" },
+        { "collection": "Cookie Heart" },
+        { "collection": "Jack-in-the-Box" },
+        { "collection": "Hanging Star" },
+        { "collection": "Trapped Heart" },
+        { "collection": "Heart Locket" },
+        { "collection": "Magic Potion" },
+        { "collection": "Mad Pumpkin" },
+        { "collection": "Party Sparkler" },
+        { "collection": "Cupid Charm" },
+        { "collection": "Kissed Frog" },
+        { "collection": "Loot Bag" },
+        { "collection": "Eternal Rose" },
+        { "collection": "Love Candle" },
+        { "collection": "Electric Skull" },
+        { "collection": "Valentine Box" },
+        { "collection": "Hex Pot" },
+        { "collection": "Swiss Watch" },
+        { "collection": "Top Hat" },
+        { "collection": "Scared Cat" },
+        { "collection": "Love Potion" },
+        { "collection": "Astral Shard" },
+        { "collection": "Ion Gem" },
+        { "collection": "Voodoo Doll" },
+        { "collection": "Restless Jar" }
+    ], []);
 
     const fetchGiftsData = useCallback(async () => {
         try {
@@ -186,6 +187,7 @@ const App = () => {
             };
 
             // 1. جلب بيانات أرخص هدية شاملة من /api/min_gift (الآن POST)
+            // استخدام مسار نسبي
             const minGiftResponse = await fetch(`${API_BASE_URL}/min_gift?pretty=true`, {
                 method: 'POST',
                 headers: requestHeaders,
@@ -193,6 +195,7 @@ const App = () => {
             });
 
             // 2. جلب جميع نماذج الهدايا من /api/models (الآن POST)
+            // استخدام مسار نسبي
             const allGiftsResponse = await fetch(`${API_BASE_URL}/models?sort_by=min_price_usd_asc&pretty=true`, {
                 method: 'POST',
                 headers: requestHeaders,
@@ -258,7 +261,8 @@ const App = () => {
 
         } catch (err: any) {
             console.error("فشل في جلب بيانات الهدايا:", err);
-            setError(`فشل في جلب بيانات الهدايا: ${err.message}. يرجى التأكد من تشغيل API الخاص بك على ${API_BASE_URL}`);
+            // تغيير رسالة الخطأ لتعكس استخدام Vercel proxy
+            setError(`فشل في جلب بيانات الهدايا: ${err.message}. يرجى التأكد من أن الـ API الخلفي يعمل بشكل صحيح وأن vercel.json مهيأ بشكل صحيح.`);
         } finally {
             setLoading(false);
         }
@@ -299,7 +303,7 @@ const App = () => {
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-300 mx-auto"></div>
                     <p className="mt-4 text-xl">جاري تحميل بيانات الهدايا...</p>
-                    <p className="text-sm text-gray-300">تأكد من تشغيل API الخاص بك على {API_BASE_URL}</p>
+                    <p className="text-sm text-gray-300">تأكد من أن الـ API الخلفي يعمل وأن vercel.json مهيأ بشكل صحيح.</p>
                 </div>
             </div>
         );
@@ -315,8 +319,7 @@ const App = () => {
                     <p className="text-xl font-bold mb-4">خطأ في جلب البيانات:</p>
                     <p>{error}</p>
                     <p className="mt-4 text-sm text-red-200">
-                        الرجاء التأكد من أن الـ API الخاص بـ physbubble-bot يعمل ويستجيب على العنوان:
-                        <br/><code className="text-yellow-200">{API_BASE_URL}</code>
+                        الرجاء التأكد من أن الـ API الخلفي يعمل بشكل صحيح وأن vercel.json مهيأ بشكل صحيح.
                     </p>
                 </div>
             </div>

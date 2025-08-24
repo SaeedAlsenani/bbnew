@@ -78,7 +78,7 @@ const App = () => {
     const [selectedTimeframe, setSelectedTimeframe] = useState('Day');
     const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null);
 
-    const API_BASE_URL = 'http://127.0.0.1:8000/api'; // تحديث: يجب أن يتطابق مع عنوان Uvicorn/FastAPI
+    const API_BASE_URL = '/api'; // تحديث: يجب أن يتطابق مع عنوان Uvicorn/FastAPI
 
     // قائمة افتراضية بالأهداف
     // يمكنك تعديل هذه القائمة لتحديد المجموعات والنماذج التي تريد جلب بياناتها

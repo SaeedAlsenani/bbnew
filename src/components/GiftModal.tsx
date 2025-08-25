@@ -3,12 +3,34 @@ import * as d3 from 'd3';
 
 // GiftModal Component: A standalone modal displaying detailed bubble information.
 // It uses Tailwind CSS for styling and includes a D3-powered chart.
-const GiftModal = ({ bubbleData, onClose }) => {
+// تم تحديث الواجهة لتعكس كائن Gift الكامل القادم من App.tsx
+// يجب أن تتطابق هذه الواجهة مع الواجهة Gift المعرفة في App.tsx
+interface Gift {
+    id: string;
+    model_name: string;
+    variant_name?: string;
+    min_price_ton: number;
+    min_price_usd: number;
+    image: string;
+    name: string;
+    symbol: string;
+    market_cap: number;
+    current_price: number;
+    price_change_percentage_24h?: number;
+    isBot?: boolean;
+}
+
+interface GiftModalProps {
+    bubbleData: Gift | null; // الآن bubbleData هو كائن Gift كامل
+    onClose: () => void;
+}
+
+const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, onClose }) => {
     const [chartTimeframe, setChartTimeframe] = useState('1D');
-    const chartRef = useRef();
+    const chartRef = useRef<SVGSVGElement>(null); // تحديد نوع المرجع لـ SVGElement
 
     // Simulated historical data for charting
-    const generateChartData = useCallback((timeframe) => {
+    const generateChartData = useCallback((timeframe: string) => {
         const now = new Date();
         let data = [];
         let numPoints;
@@ -42,12 +64,12 @@ const GiftModal = ({ bubbleData, onClose }) => {
 
         for (let i = 0; i < numPoints; i++) {
             const date = new Date(now.getTime() - (numPoints - 1 - i) * interval);
-            // Simulate price fluctuation around the current price
-            const price = bubbleData.current_price * (1 + (Math.random() - 0.5) * 0.2);
+            // Simulate price fluctuation around the current price from bubbleData
+            const price = (bubbleData?.current_price || 0) * (1 + (Math.random() - 0.5) * 0.2);
             data.push({ date, price });
         }
         return data;
-    }, [bubbleData]);
+    }, [bubbleData]); // يعتمد على bubbleData لتوليد بيانات الرسم البياني
 
     // Effect for D3 chart rendering within the modal
     useEffect(() => {
@@ -63,16 +85,32 @@ const GiftModal = ({ bubbleData, onClose }) => {
 
         if (width <= 0 || height <= 0) return; // Prevent drawing on invalid dimensions
 
+        // Define gradient for area chart fill - moved here to be within the useEffect scope
+        const defs = svg.append("defs");
+        const chartGradient = defs.append("linearGradient")
+            .attr("id", "chartGradient")
+            .attr("x1", "0%")
+            .attr("y1", "0%")
+            .attr("x2", "0%")
+            .attr("y2", "100%");
+        chartGradient.append("stop")
+            .attr("offset", "0%")
+            .attr("stop-color", "rgba(59, 130, 246, 0.5)"); // Blue with transparency
+        chartGradient.append("stop")
+            .attr("offset", "100%")
+            .attr("stop-color", "rgba(59, 130, 246, 0)"); // Transparent blue
+
+
         const g = svg.append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
         // Scales
         const xScale = d3.scaleTime()
-            .domain(d3.extent(chartData, d => d.date))
+            .domain(d3.extent(chartData, d => d.date) as [Date, Date]) // تحديد النوع لضمان عدم وجود undefined
             .range([0, width]);
 
         const yScale = d3.scaleLinear()
-            .domain([d3.min(chartData, d => d.price) * 0.95, d3.max(chartData, d => d.price) * 1.05])
+            .domain([d3.min(chartData, d => d.price) * 0.95, d3.max(chartData, d => d.price) * 1.05] as [number, number]) // تحديد النوع
             .range([height, 0]);
 
         // Axes
@@ -111,7 +149,7 @@ const GiftModal = ({ bubbleData, onClose }) => {
             .attr("stroke-dasharray", "2,2");
 
         // Area path
-        const area = d3.area()
+        const area = d3.area<{ date: Date, price: number }>() // تحديد نوع البيانات لـ d3.area
             .x(d => xScale(d.date))
             .y0(height)
             .y1(d => yScale(d.price));
@@ -123,26 +161,12 @@ const GiftModal = ({ bubbleData, onClose }) => {
             .attr("stroke-width", 1.5)
             .attr("d", area);
 
-        // Gradient for area chart fill
-        const defs = svg.append("defs");
-        const chartGradient = defs.append("linearGradient")
-            .attr("id", "chartGradient")
-            .attr("x1", "0%")
-            .attr("y1", "0%")
-            .attr("x2", "0%")
-            .attr("y2", "100%");
-        chartGradient.append("stop")
-            .attr("offset", "0%")
-            .attr("stop-color", "rgba(59, 130, 246, 0.5)"); // Blue with transparency
-        chartGradient.append("stop")
-            .attr("offset", "100%")
-            .attr("stop-color", "rgba(59, 130, 246, 0)"); // Transparent blue
-
-    }, [bubbleData, chartTimeframe, generateChartData]);
+    }, [bubbleData, chartTimeframe, generateChartData]); // إعادة ترتيب التبعيات هنا
 
     if (!bubbleData) return null;
 
     // Simulated data for the gift/coin details and Fear & Greed Index
+    // يمكن استبدال هذه البيانات المحاكية ببيانات حقيقية من الـ API إذا توفرت
     const simulatedGiftData = {
         initialSupply: 15000,
         supply: 5448,
@@ -155,64 +179,64 @@ const GiftModal = ({ bubbleData, onClose }) => {
     const fearGreedIndex = 87; // Example value
 
     // Function to draw the semi-circle gauge for Fear & Greed Index
-const drawGauge = (value, max = 100) => {
-    const radius = 40; // Smaller radius for the gauge
-    const arcWidth = 8;
-    const angleScale = d3.scaleLinear()
-        .domain([0, max])
-        .range([-Math.PI / 2, Math.PI / 2]);
+    const drawGauge = (value: number, max = 100) => { // تحديد نوع value كـ number
+        const radius = 40; // Smaller radius for the gauge
+        const arcWidth = 8;
+        const angleScale = d3.scaleLinear()
+            .domain([0, max])
+            .range([-Math.PI / 2, Math.PI / 2]);
 
-    const arcGenerator = d3.arc()
-        .innerRadius(radius - arcWidth)
-        .outerRadius(radius)
-        .startAngle(-Math.PI / 2);
+        const arcGenerator = d3.arc()
+            .innerRadius(radius - arcWidth)
+            .outerRadius(radius)
+            .startAngle(-Math.PI / 2);
 
-    const needleLength = radius - arcWidth - 5;
-    const needleBaseWidth = 2;
+        const needleLength = radius - arcWidth - 5;
+        const needleBaseWidth = 2;
 
-    return (
-        <svg width={radius * 2 + 20} height={radius + 30} viewBox={`0 0 ${radius * 2 + 20} ${radius + 30}`}>
-            {/* التدرج اللوني */}
-            <defs>
-                <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#EF4444" /> {/* أحمر */}
-                    <stop offset="50%" stopColor="#FBBF24" /> {/* أصفر */}
-                    <stop offset="100%" stopColor="#22C55E" /> {/* أخضر */}
-                </linearGradient>
-            </defs>
+        return (
+            <svg width={radius * 2 + 20} height={radius + 30} viewBox={`0 0 ${radius * 2 + 20} ${radius + 30}`}>
+                {/* التدرج اللوني */}
+                <defs>
+                    <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#EF4444" /> {/* أحمر */}
+                        <stop offset="50%" stopColor="#FBBF24" /> {/* أصفر */}
+                        <stop offset="100%" stopColor="#22C55E" /> {/* أخضر */}
+                    </linearGradient>
+                </defs>
 
-            <g transform={`translate(${radius + 10}, ${radius + 10})`}>
-                {/* الخلفية */}
-                <path d={arcGenerator({ endAngle: Math.PI / 2 })} fill="#4b5563" />
-                {/* القوس المتدرج */}
-                <path d={arcGenerator({ endAngle: angleScale(value) })} fill="url(#gaugeGradient)" />
+                <g transform={`translate(${radius + 10}, ${radius + 10})`}>
+                    {/* الخلفية */}
+                    <path d={arcGenerator({ endAngle: Math.PI / 2 }) || undefined} fill="#4b5563" /> {/* إضافة || undefined */}
+                    {/* القوس المتدرج */}
+                    <path d={arcGenerator({ endAngle: angleScale(value) }) || undefined} fill="url(#gaugeGradient)" /> {/* إضافة || undefined */}
 
-                {/* المؤشر */}
-                <line
-                    x1="0" y1="0"
-                    x2="0" y2={-needleLength}
-                    stroke="#fff"
-                    strokeWidth={needleBaseWidth}
-                    strokeLinecap="round"
-                    transform={`rotate(${angleScale(value) * 180 / Math.PI})`}
-                >
-                    <animateTransform
-                        attributeName="transform"
-                        type="rotate"
-                        from={`0 0 0`}
-                        to={`${angleScale(value) * 180 / Math.PI} 0 0`}
-                        dur="0.5s"
-                        fill="freeze"
-                    />
-                </line>
-                <circle r="3" fill="#fff" /> {/* النقطة المركزية */}
+                    {/* المؤشر */}
+                    <line
+                        x1="0" y1="0"
+                        x2="0" y2={-needleLength}
+                        stroke="#fff"
+                        strokeWidth={needleBaseWidth}
+                        strokeLinecap="round"
+                        transform={`rotate(${angleScale(value) * 180 / Math.PI})`}
+                    >
+                        <animateTransform
+                            attributeName="transform"
+                            type="rotate"
+                            from={`0 0 0`}
+                            to={`${angleScale(value) * 180 / Math.PI} 0 0`}
+                            dur="0.5s"
+                            fill="freeze"
+                        />
+                    </line>
+                    <circle r="3" fill="#fff" /> {/* النقطة المركزية */}
 
-                {/* النص */}
-                <text x="0" y="10" textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">{value}</text>
-                <text x="0" y="20" textAnchor="middle" fill="#9ca3af" fontSize="9">FEAR/GREED</text>
-            </g>
-        </svg>
-    );
+                    {/* النص */}
+                    <text x="0" y="10" textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">{value}</text>
+                    <text x="0" y="20" textAnchor="middle" fill="#9ca3af" fontSize="9">FEAR/GREED</text>
+                </g>
+            </svg>
+        );
     };
 
     return (
@@ -228,29 +252,46 @@ const drawGauge = (value, max = 100) => {
                 </button>
 
                 {/* Top 50% Section - Grid Layout */}
-                {/* Swapped Part 1 (Price) and Part 2 (Fear/Greed Index) */}
-                {/* Swapped Part 3 (Image) and Part 4 (Supply Data) */}
                 <div className="grid grid-cols-2 grid-rows-2 gap-4 flex-grow-0 flex-shrink-0 h-1/2 mb-4">
                     {/* Part 2 (Top Left): Fear & Greed Index - Now in top-left */}
                     <div className="flex flex-col items-start justify-center p-2">
                         {drawGauge(fearGreedIndex)}
                         <div className="bg-gray-700 text-gray-400 text-[10px] font-medium px-1.5 py-0.5 rounded-md mt-3 leading-tight">
-  The market in general
-</div>
+                            The market in general
+                        </div>
                     </div>
 
                     {/* Part 1 (Top Right): Price and % Change - Now in top-right */}
                     <div className="flex flex-col items-end justify-center p-2">
-                        <p className="text-2xl font-bold text-gray-100">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(bubbleData.current_price)}
+                        {/* عرض سعر TON وسعر USD الحقيقيين من bubbleData */}
+                        <p className="text-xl font-bold text-gray-100">
+                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(bubbleData.min_price_usd)}
                         </p>
-                        <p className={`text-lg font-semibold ${bubbleData.price_change_percentage_24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {bubbleData.price_change_percentage_24h >= 0 ? '+' : ''}{bubbleData.price_change_percentage_24h.toFixed(2)}%
+                        <p className="text-gray-300 text-sm mb-1">
+                            {bubbleData.min_price_ton.toFixed(4)} TON
                         </p>
+                        {bubbleData.price_change_percentage_24h !== undefined && (
+                            <p className={`text-lg font-semibold ${bubbleData.price_change_percentage_24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {bubbleData.price_change_percentage_24h >= 0 ? '+' : ''}{bubbleData.price_change_percentage_24h.toFixed(2)}%
+                            </p>
+                        )}
                     </div>
 
                     {/* Part 4 (Bottom Left): Supply Data - Now in bottom-left */}
                     <div className="flex flex-col items-start justify-center p-2 text-sm">
+                         {/* عرض اسم الهدية والنموذج */}
+                         <p className="text-base font-bold text-gray-100 mb-2">{bubbleData.name}</p>
+                        <div className="flex justify-between w-full mb-0.5">
+                            <span className="text-gray-300">Model Name:</span>
+                            <span className="text-gray-100 font-semibold">{bubbleData.model_name}</span>
+                        </div>
+                        {bubbleData.variant_name && (
+                            <div className="flex justify-between w-full mb-0.5">
+                                <span className="text-gray-300">Variant Name:</span>
+                                <span className="text-gray-100 font-semibold">{bubbleData.variant_name}</span>
+                            </div>
+                        )}
+                        {/* يمكنك إضافة المزيد من تفاصيل 'simulatedGiftData' هنا إذا كانت متاحة من الـ API */}
                         <div className="flex justify-between w-full mb-0.5">
                             <span className="text-gray-300">Initial Supply:</span>
                             <span className="text-gray-100 font-semibold">{simulatedGiftData.initialSupply.toLocaleString()}</span>
@@ -272,15 +313,19 @@ const drawGauge = (value, max = 100) => {
                             <span className="text-orange-400 font-semibold">{simulatedGiftData.percentBurnt}%</span>
                         </div>
                         <div className="flex justify-between w-full">
-                            <span className="text-gray-300">% Upgraded:</span>
+                            <span className="text-gray-300"> % Upgraded:</span>
                             <span className="text-blue-400 font-semibold">{simulatedGiftData.percentUpgraded}%</span>
                         </div>
                     </div>
 
                     {/* Part 3 (Bottom Right): Gift/Coin Image and Name - Now in bottom-right */}
                     <div className="flex flex-col items-end justify-center p-2">
-                        <img src={bubbleData.image} alt={bubbleData.symbol} className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover mb-2" />
+                        <img src={bubbleData.image} alt={bubbleData.name} className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover mb-2" />
+                        {/* عرض اسم الهدية بشكل أوضح */}
                         <h3 className="text-lg font-bold text-gray-100 text-right">{bubbleData.name}</h3>
+                        {bubbleData.variant_name && bubbleData.name !== bubbleData.variant_name && (
+                             <p className="text-sm text-gray-400 text-right">{bubbleData.variant_name}</p>
+                        )}
                     </div>
                 </div>
 
@@ -310,4 +355,3 @@ const drawGauge = (value, max = 100) => {
 };
 
 export default GiftModal;
-

@@ -3,9 +3,10 @@ import * as d3 from 'd3';
 
 // BubbleCanvas Component: Handles D3.js bubble rendering, physics, and interactions.
 // It does NOT contain any modal logic.
+// تم تحديث الواجهة لتمرير بيانات Gift كاملة عند النقر
 const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubbleClick }) => {
-    const svgRef = useRef();
-    const containerRef = useRef();
+    const svgRef = useRef(null); // تهيئة useRef بـ null
+    const containerRef = useRef(null); // تهيئة useRef بـ null
     const simulationRef = useRef(null); // Reference to D3 force simulation
 
     // State for dimensions to ensure responsive rendering
@@ -25,7 +26,7 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
                 const height = containerRef.current.clientHeight;
 
                 // Log dimensions for debugging
-                console.log(`BubbleCanvas: Dimensions updated. Width: ${width}, Height: ${height}`);
+                // console.log(`BubbleCanvas: Dimensions updated. Width: ${width}, Height: ${height}`);
 
                 if (width > 0 && height > 0) {
                     setDimensions({ width, height });
@@ -64,20 +65,20 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
 
         // Do not proceed with D3 simulation if data is not loaded or dimensions are invalid (0x0)
         // Robust check: Ensure cryptoData is an array and not empty, and dimensions are valid.
-        console.log('BubbleCanvas Effect - cryptoData:', cryptoData);
-        console.log('BubbleCanvas Effect - loading:', loading);
-        console.log('BubbleCanvas Effect - selectedCryptos:', selectedCryptos);
-        console.log('BubbleCanvas Effect - dimensions:', dimensions);
+        // console.log('BubbleCanvas Effect - cryptoData:', cryptoData);
+        // console.log('BubbleCanvas Effect - loading:', loading);
+        // console.log('BubbleCanvas Effect - selectedCryptos:', selectedCryptos);
+        // console.log('BubbleCanvas Effect - dimensions:', dimensions);
 
         if (!Array.isArray(cryptoData) || cryptoData.length === 0 || loading || width === 0 || height === 0 || !svgRef.current) {
             if (simulationRef.current) {
                 simulationRef.current.stop();
             }
-            console.log("BubbleCanvas: D3 simulation deferred due to invalid data/dimensions or loading state.");
+            // console.log("BubbleCanvas: D3 simulation deferred due to invalid data/dimensions or loading state.");
             return;
         }
 
-        console.log("BubbleCanvas: Valid dimensions and data. Starting D3 simulation.");
+        // console.log("BubbleCanvas: Valid dimensions and data. Starting D3 simulation.");
 
         // Stop the old simulation if it exists before creating a new one
         if (simulationRef.current) {
@@ -89,7 +90,7 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
 
         // Filter data based on selectedCryptos
         const filteredCryptoData = cryptoData.filter(d => selectedCryptos.includes(d.id));
-        console.log('BubbleCanvas: filteredCryptoData (after selection):', filteredCryptoData);
+        // console.log('BubbleCanvas: filteredCryptoData (after selection):', filteredCryptoData);
 
 
         let sortedData = [...filteredCryptoData];
@@ -99,12 +100,12 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
         if (sortMethod === 'marketCap') {
             sortedData.sort((a, b) => b.market_cap - a.market_cap);
         }
-        console.log('BubbleCanvas: sortedData (after sorting):', sortedData);
+        // console.log('BubbleCanvas: sortedData (after sorting):', sortedData);
 
         // --- IMPORTANT: Add this check before d3.max and sizeScale ---
         // This prevents TypeError if sortedData becomes empty after filtering
         if (sortedData.length === 0) {
-            console.log("BubbleCanvas: No data after filtering or initial load. Skipping D3 rendering.");
+            // console.log("BubbleCanvas: No data after filtering or initial load. Skipping D3 rendering.");
             if (simulationRef.current) {
                 simulationRef.current.stop();
             }
@@ -114,7 +115,7 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
         // --- End of check ---
 
         const maxMarketCap = d3.max(sortedData, d => d.market_cap);
-        console.log('BubbleCanvas: maxMarketCap:', maxMarketCap);
+        // console.log('BubbleCanvas: maxMarketCap:', maxMarketCap);
 
         // Ensure maxMarketCap is not zero or negative for a valid scale domain
         const sizeScale = d3.scaleSqrt()
@@ -122,7 +123,7 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
             .range([10, Math.min(width, height) / 8]);
 
         let nodes = sortedData.map(d => ({ ...d, r: sizeScale(d.market_cap) }));
-        console.log('BubbleCanvas: Nodes for simulation:', nodes);
+        // console.log('BubbleCanvas: Nodes for simulation:', nodes);
 
 
         // --- Bot Bubble Logic ---
@@ -145,8 +146,11 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
                 market_cap: 0, 
                 current_price: 0,
                 price_change_percentage_24h: 0,
+                model_name: 'Bot', // إضافة حقول افتراضية لتجنب أخطاء TypeScript
+                min_price_ton: 0,
+                min_price_usd: 0,
             };
-            console.log('BubbleCanvas: Bot bubble data created/updated:', botBubbleDataRef.current);
+            // console.log('BubbleCanvas: Bot bubble data created/updated:', botBubbleDataRef.current);
         }
 
         // Add the bot bubble to the nodes array if it exists
@@ -225,7 +229,8 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
             .attr('class', 'bubble')
             .call(drag)
             .on('click', (event, d) => { // Click handler to pass data to parent (App.tsx)
-                onBubbleClick(d);
+                // 👈 التعديل الرئيسي هنا: تمرير كائن `d` الكامل
+                onBubbleClick(d); 
             });
 
         bubbleGroup.append('circle')
@@ -234,6 +239,7 @@ const BubbleCanvas = ({ cryptoData, loading, selectedCryptos, sortMethod, onBubb
                 if (d.isBot) {
                     return 'url(#blueGradient)'; // Use the blue gradient for the bot
                 }
+                // يجب أن تكون price_change_percentage_24h موجودة لكائنات cryptoData
                 return d.price_change_percentage_24h >= 0 ? 'url(#greenGradient)' : 'url(#redGradient)';
             })
             .attr('stroke', 'none');

@@ -80,7 +80,7 @@
         const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null); 
 
         // تغيير API_BASE_URL ليكون مساراً نسبياً ليتم التعامل معه بواسطة vercel.json
-        const API_BASE_URL = process.env.REACT_APP_API_URL 'https://physbubble.lovestoblog.com/api'; 
+        const API_BASE_URL = process.env.REACT_APP_API_URL || '/api'; 
 
         // قائمة افتراضية بالأهداف
         // يمكنك تعديل هذه القائمة لتحديد المجموعات والنماذج التي تريد جلب بياناتها

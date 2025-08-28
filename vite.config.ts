@@ -1,19 +1,44 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react-swc';
+@import path from "path";
+import { defineConfig } 
+from "vite";
+import react from 
+"@vitejs/plugin-react-swc";
+import { tempo } from 
+"tempo-devtools/dist/vite";
 
-// https://vitejs.dev/config/
+// 
+https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  base: process.env.NODE_ENV === 
+"development" ? "/" : 
+process.env.VITE_BASE_PATH
+ || "/",
+  optimizeDeps: {
+    entries: 
+["src/main.tsx", 
+"src/tempobook/**/*"],
+  },
+  plugins: [
+    react(),
+    tempo(),
+  ],
+  resolve: {
+    preserveSymlinks: true,
+    alias: {
+      "@": 
+path.resolve(__dirname, 
+"./src"),
+    },
+  },
   server: {
-    proxy: {
-      '/api': {
-        // تأكد من أن هذا هو عنوان IP والمنفذ الفعلي للـ API الخلفي
-        target: 'http://45.61.150.204:8000', 
-        changeOrigin: true, // مهم لتغيير رأس Origin إلى عنوان الـ API المستهدف
-        // لا نحتاج إلى 'rewrite' هنا لأن الـ API الخلفي يتوقع '/api' في المسار.
-        // الطلب من React إلى '/api/min_gift' سيتم توجيهه مباشرة إلى 
-        // 'http://45.61.150.204:8000/api/min_gift'
-      },
+    // @ts-ignore
+    allowedHosts: true,
+  },
+  // ✅ هذا هو الجزء المضاف لحل المشكلة:
+  build: {
+    rollupOptions: {
+      external: 
+['firebase/auth'],
     },
   },
 });

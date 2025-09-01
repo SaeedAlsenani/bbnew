@@ -80,7 +80,7 @@ const App = () => {
     const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null); 
 
     // الرابط الجديد للـ API
-    const API_URL = "http://[2602:fa59:3:23d::1]/api/gifts";
+    const API_BASE_URL = 'https://my-telegram-bot-test.com/api'; 
 
     // قائمة المجموعات الافتراضية
     const defaultCollections = useMemo(() => [

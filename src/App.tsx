@@ -80,7 +80,7 @@ const App = () => {
     const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null); 
 
     // الرابط الجديد للـ API
-    const API_BASE_URL = 'https://physbubble.lovestoblog.com/api';
+    const API_BASE_URL = 'https://physbubble-bot.onrender.com/api';
 
     // قائمة المجموعات الافتراضية
     const defaultCollections = useMemo(() => [

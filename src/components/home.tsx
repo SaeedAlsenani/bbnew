@@ -9,7 +9,7 @@ export default function App() {
     <>
       <BubbleCanvas onBubbleClick={(gift) => setSelectedGift(gift)} />
       {selectedGift && (
-        <GiftModal data={selectedGift} onClose={() => setSelectedGift(null)} />
+        <GiftModal bubbleData={selectedGift} onClose={() => setSelectedGift(null)} /> 
       )}
     </>
   );

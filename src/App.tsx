@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import BubbleCanvas from './components/BubbleCanvas';
 import GiftModal from './components/GiftModal';
+import { fetchCollections } from './service/api'; // استيراد دالة جلب المجموعات
 
 // SVG Icons (kept as is)
 const LuEye = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>;
@@ -71,50 +72,77 @@ const App = () => {
     const [overallMinGift, setOverallMinGift] = useState<Gift | null>(null);
     const [tonPrice, setTonPrice] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
+    const [collectionsLoading, setCollectionsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [collectionsError, setCollectionsError] = useState<string | null>(null);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [selectedGifts, setSelectedGifts] = useState<string[]>([]);
     const [sortMethod, setSortMethod] = useState<'random' | 'price'>('random'); // 'price' for min_price_usd_asc
     const [selectedTimeframe, setSelectedTimeframe] = useState('Day');
     // تم التعديل هنا: قيمة useState الأولية يجب أن تكون `null` وليس متغيرًا
     const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null); 
+    const [collections, setCollections] = useState<string[]>([]); // state لتخزين المجموعات
 
     // الرابط الجديد للـ API
     const API_BASE_URL = 'https://physbubble-bot.onrender.com/api';
 
-    // قائمة المجموعات الافتراضية
-    const defaultCollections = useMemo(() => [
-      "Plush Pepe", "Eternal Candle", "Snoop Dogg", "Jingle Bells", "Pet Snake",
-      "Tama Gadget", "Lunar Snake", "Snow Mittens", "Witch Hat", "Lol Pop",
-      "Spy Agaric", "Bunny Muffin", "Low Rider", "Whip Cupcake", "Berry Box",
-      "Swag Bag", "Precious Peach", "Light Sword", "Durov's Cap", "Bow Tie",
-      "Candy Cane", "Heroic Helmet", "Sleigh Bell", "Snake Box", "Neko Helmet",
-      "Diamond Ring", "Sakura Flower", "Westside Sign", "Evil Eye", "Record Player",
-      "Skull Flower", "Easter Egg", "B-Day Candle", "Desk Calendar", "Star Notepad",
-      "Joyful Bundle", "Plush Pepe", "Eternal Candle", "Snoop Dogg", "Sharp Tongue",
-      "Snow Globe", "Holiday Drink", "Flying Broom", "Big Year", "Hypno Lollipop",
-      "Genie Lamp", "Bonded Ring", "Spiced Wine", "Snoop Cigar", "Xmas Stocking",
-      "Homemade Cake", "Toy Bear", "Vintage Cigar", "Signet Ring", "Gem Signet",
-      "Lush Bouquet", "Santa Hat", "Winter Wreath", "Nail Bracelet", "Ginger Cookie",
-      "Perfume Bottle", "Crystal Ball", "Mini Oscar", "Jelly Bunny", "Jester Hat",
-      "Cookie Heart", "Jack-in-the-Box", "Hanging Star", "Trapped Heart", "Heart Locket",
-      "Magic Potion", "Mad Pumpkin", "Party Sparkler", "Cupid Charm", "Kissed Frog",
-      "Loot Bag", "Eternal Rose", "Love Candle", "Electric Skull", "Valentine Box",
-      "Hex Pot", "Swiss Watch", "Top Hat", "Scared Cat", "Love Potion", "Astral Shard",
-      "Ion Gem", "Voodoo Doll", "Restless Jar"
-    ], []);
+    // جلب قائمة المجموعات من API
+    const fetchCollectionsData = useCallback(async () => {
+        try {
+            setCollectionsLoading(true);
+            setCollectionsError(null);
+            
+            const collectionsData = await fetchCollections();
+            const collectionNames = collectionsData.map(col => col.name);
+            
+            setCollections(collectionNames);
+            console.log('تم جلب المجموعات بنجاح:', collectionNames);
+            
+        } catch (err: any) {
+            console.error("فشل في جلب قائمة المجموعات:", err);
+            setCollectionsError(`فشل في جلب قائمة المجموعات: ${err.message}`);
+            
+            // استخدام القائمة الافتراضية كاحتياطي في حالة الخطأ
+            const defaultCollections = [
+                "Plush Pepe", "Eternal Candle", "Snoop Dogg", "Jingle Bells", "Pet Snake",
+                "Tama Gadget", "Lunar Snake", "Snow Mittens", "Witch Hat", "Lol Pop",
+                "Spy Agaric", "Bunny Muffin", "Low Rider", "Whip Cupcake", "Berry Box",
+                "Swag Bag", "Precious Peach", "Light Sword", "Durov's Cap", "Bow Tie",
+                "Candy Cane", "Heroic Helmet", "Sleigh Bell", "Snake Box", "Neko Helmet",
+                "Diamond Ring", "Sakura Flower", "Westside Sign", "Evil Eye", "Record Player",
+                "Skull Flower", "Easter Egg", "B-Day Candle", "Desk Calendar", "Star Notepad",
+                "Joyful Bundle", "Plush Pepe", "Eternal Candle", "Snoop Dogg", "Sharp Tongue",
+                "Snow Globe", "Holiday Drink", "Flying Broom", "Big Year", "Hypno Lollipop",
+                "Genie Lamp", "Bonded Ring", "Spiced Wine", "Snoop Cigar", "Xmas Stocking",
+                "Homemade Cake", "Toy Bear", "Vintage Cigar", "Signet Ring", "Gem Signet",
+                "Lush Bouquet", "Santa Hat", "Winter Wreath", "Nail Bracelet", "Ginger Cookie",
+                "Perfume Bottle", "Crystal Ball", "Mini Oscar", "Jelly Bunny", "Jester Hat",
+                "Cookie Heart", "Jack-in-the-Box", "Hanging Star", "Trapped Heart", "Heart Locket",
+                "Magic Potion", "Mad Pumpkin", "Party Sparkler", "Cupid Charm", "Kissed Frog",
+                "Loot Bag", "Eternal Rose", "Love Candle", "Electric Skull", "Valentine Box",
+                "Hex Pot", "Swiss Watch", "Top Hat", "Scared Cat", "Love Potion", "Astral Shard",
+                "Ion Gem", "Voodoo Doll", "Restless Jar"
+            ];
+            setCollections(defaultCollections);
+            
+        } finally {
+            setCollectionsLoading(false);
+        }
+    }, []);
 
     const fetchGiftsData = useCallback(async () => {
+        if (collections.length === 0) return; // لا تجلب البيانات إذا لم تكن المجموعات جاهزة
+
         try {
             setLoading(true);
             setError(null);
 
             // إنشاء query string للمجموعات
-            const collectionsQuery = defaultCollections.map(col => 
+            const collectionsQuery = collections.map(col => 
                 encodeURIComponent(col)).join(',');
             
             // جلب البيانات من API الجديد
-            const response = await fetch(`${API_URL}?collections=${collectionsQuery}`);
+            const response = await fetch(`${API_BASE_URL}/gifts?target_items=${collectionsQuery}`);
             
             if (!response.ok) {
                 const errorText = await response.text();
@@ -138,26 +166,26 @@ const App = () => {
                 timestamp: apiData.timestamp,
                 last_updated: new Date().toISOString(),
                 _sort_order: "min_price_usd_asc",
-                total_models: apiData.total_gifts || 0,
-                success_rate: "100%"
+                total_models: apiData.total_items || 0,
+                success_rate: apiData.success_rate || "100%"
             };
 
             const mockAllGiftsResponse: AllGiftModelsApiResponse = {
                 gift_models_min_prices: apiData.gifts ? apiData.gifts.map((gift: any) => ({
-                    model_name: gift.collection,
+                    model_name: gift.collection || gift.model_name || 'Unknown',
                     min_price_ton: gift.price_ton,
                     min_price_usd: gift.price_usd,
                     image: gift.image,
-                    variant_id: gift.id,
-                    variant_name: gift.name,
-                    is_valid: true
+                    variant_id: gift.id || gift.variant_id,
+                    variant_name: gift.name || gift.variant_name,
+                    is_valid: gift.is_valid !== undefined ? gift.is_valid : true
                 })) : [],
                 ton_price: apiData.ton_price,
                 timestamp: apiData.timestamp,
-                last_updated: new Date().toISOString(),
+                last_updated: apiData.last_updated,
                 _sort_order: "min_price_usd_asc",
-                total_models: apiData.total_gifts || 0,
-                success_rate: "100%"
+                total_models: apiData.total_items || 0,
+                success_rate: apiData.success_rate || "100%"
             };
 
             // معالجة استجابة min_gift
@@ -195,7 +223,7 @@ const App = () => {
                     min_price_ton: gift.min_price_ton,
                     min_price_usd: gift.min_price_usd,
                     image: gift.image || 'https://placehold.co/60x60/333/FFF?text=Gift',
-                    symbol: gift.model_name.substring(0, 3).toUpperCase(),
+                    symbol: (gift.model_name || 'Unknown').substring(0, 3).toUpperCase(),
                     market_cap: gift.min_price_usd,
                     current_price: gift.min_price_usd,
                     price_change_percentage_24h: Math.random() > 0.5 ? 
@@ -213,13 +241,19 @@ const App = () => {
         } finally {
             setLoading(false);
         }
-    }, [defaultCollections]);
+    }, [collections]); // إضافة collections كاعتماد
 
     useEffect(() => {
-        fetchGiftsData();
-        const interval = setInterval(fetchGiftsData, 300000); // 5 دقائق
-        return () => clearInterval(interval);
-    }, [fetchGiftsData]);
+        fetchCollectionsData();
+    }, [fetchCollectionsData]);
+
+    useEffect(() => {
+        if (collections.length > 0 && !collectionsLoading) {
+            fetchGiftsData();
+            const interval = setInterval(fetchGiftsData, 300000); // 5 دقائق
+            return () => clearInterval(interval);
+        }
+    }, [fetchGiftsData, collections, collectionsLoading]);
 
     const filteredGifts = useMemo(() => 
         giftsData.filter(gift => selectedGifts.includes(gift.id)),
@@ -240,6 +274,38 @@ const App = () => {
 
     const upCount = giftsData.filter(d => d.price_change_percentage_24h && d.price_change_percentage_24h > 0).length;
     const downCount = giftsData.filter(d => d.price_change_percentage_24h && d.price_change_percentage_24h < 0).length;
+
+    // حالة التحميل للمجموعات
+    if (collectionsLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-gray-900 text-gray-100 font-sans">
+                <style>
+                    {`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');`}
+                </style>
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-300 mx-auto"></div>
+                    <p className="mt-4 text-xl">جاري تحميل قائمة المجموعات...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (collectionsError) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-red-800 text-white font-sans p-4">
+                <style>
+                    {`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');`}
+                </style>
+                 <div className="text-center bg-red-900 p-6 rounded-lg shadow-xl">
+                    <p className="text-xl font-bold mb-4">خطأ في جلب قائمة المجموعات:</p>
+                    <p>{collectionsError}</p>
+                    <p className="mt-4 text-sm text-red-200">
+                        تم استخدام قائمة افتراضية كاحتياطي.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     if (loading) {
         return (

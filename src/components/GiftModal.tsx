@@ -1,4 +1,3 @@
-    // src/components/GiftModal.tsx - إضافة التوافق
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as d3 from 'd3';
 
@@ -30,11 +29,6 @@ const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
     
     const [chartTimeframe, setChartTimeframe] = useState('1D');
     const chartRef = useRef<SVGSVGElement>(null);
-
-    if (!giftData) return null;
-
-    // داخل useEffect الخاص بالرسم البياني، تعديل السطر:
-    .attr("d", area || ""); // إضافة fallback لمنع الأخطاء
 
     // Simulated historical data for charting
     const generateChartData = useCallback((timeframe: string) => {
@@ -71,16 +65,16 @@ const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
 
         for (let i = 0; i < numPoints; i++) {
             const date = new Date(now.getTime() - (numPoints - 1 - i) * interval);
-            // Simulate price fluctuation around the current price from bubbleData
-            const price = (bubbleData?.current_price || 0) * (1 + (Math.random() - 0.5) * 0.2);
+            // Simulate price fluctuation around the current price from giftData
+            const price = (giftData?.current_price || 0) * (1 + (Math.random() - 0.5) * 0.2);
             data.push({ date, price });
         }
         return data;
-    }, [bubbleData]); // يعتمد على bubbleData لتوليد بيانات الرسم البياني
+    }, [giftData]); // يعتمد على giftData لتوليد بيانات الرسم البياني
 
     // Effect for D3 chart rendering within the modal
     useEffect(() => {
-        if (!bubbleData || !chartRef.current) return;
+        if (!giftData || !chartRef.current) return;
 
         const chartData = generateChartData(chartTimeframe);
         const svg = d3.select(chartRef.current);
@@ -107,7 +101,6 @@ const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
             .attr("offset", "100%")
             .attr("stop-color", "rgba(59, 130, 246, 0)"); // Transparent blue
 
-
         const g = svg.append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -117,7 +110,7 @@ const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
             .range([0, width]);
 
         const yScale = d3.scaleLinear()
-            .domain([d3.min(chartData, d => d.price) * 0.95, d3.max(chartData, d => d.price) * 1.05] as [number, number]) // تحديد النوع
+            .domain([d3.min(chartData, d => d.price) as number * 0.95, d3.max(chartData, d => d.price) as number * 1.05]) // تحديد النوع
             .range([height, 0]);
 
         // Axes
@@ -125,7 +118,7 @@ const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
             .attr("transform", `translate(0,${height})`)
             .call(d3.axisBottom(xScale)
                 .ticks(5)
-                .tickFormat(d3.timeFormat(chartTimeframe === '1H' ? '%H:%M' : '%Y-%m-%d'))
+                .tickFormat(d3.timeFormat(chartTimeframe === '1H' ? '%H:%M' : '%Y-%m-%d') as any)
                 .tickSizeOuter(0)
             )
             .selectAll("text")
@@ -134,7 +127,7 @@ const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
         g.append("g")
             .call(d3.axisLeft(yScale)
                 .ticks(5)
-                .tickFormat(d => `$${d3.format(".2s")(d)}`)
+                .tickFormat(d => `$${d3.format(".2s")(d as number)}`)
             )
             .selectAll("text")
             .style("fill", "#9ca3af"); // Gray text for axis labels
@@ -143,14 +136,14 @@ const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
         g.append("g")
             .attr("class", "grid")
             .attr("transform", `translate(0,${height})`)
-            .call(d3.axisBottom(xScale).ticks(5).tickSize(-height).tickFormat(""))
+            .call(d3.axisBottom(xScale).ticks(5).tickSize(-height).tickFormat("" as any))
             .selectAll("line")
             .attr("stroke", "#4b5563") // Darker gray for grid lines
             .attr("stroke-dasharray", "2,2");
 
         g.append("g")
             .attr("class", "grid")
-            .call(d3.axisLeft(yScale).ticks(5).tickSize(-width).tickFormat(""))
+            .call(d3.axisLeft(yScale).ticks(5).tickSize(-width).tickFormat("" as any))
             .selectAll("line")
             .attr("stroke", "#4b5563") // Darker gray for grid lines
             .attr("stroke-dasharray", "2,2");
@@ -166,14 +159,13 @@ const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
             .attr("fill", "url(#chartGradient)") // Use gradient for area fill
             .attr("stroke", "#3B82F6") // Blue line
             .attr("stroke-width", 1.5)
-            .attr("d", area);
+            .attr("d", area || ""); // إضافة fallback لمنع الأخطاء
 
-    }, [bubbleData, chartTimeframe, generateChartData]); // إعادة ترتيب التبعيات هنا
+    }, [giftData, chartTimeframe, generateChartData]); // إعادة ترتيب التبعيات هنا
 
-    if (!bubbleData) return null;
+    if (!giftData) return null;
 
     // Simulated data for the gift/coin details and Fear & Greed Index
-    // يمكن استبدال هذه البيانات المحاكية ببيانات حقيقية من الـ API إذا توفرت
     const simulatedGiftData = {
         initialSupply: 15000,
         supply: 5448,
@@ -186,7 +178,7 @@ const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
     const fearGreedIndex = 87; // Example value
 
     // Function to draw the semi-circle gauge for Fear & Greed Index
-    const drawGauge = (value: number, max = 100) => { // تحديد نوع value كـ number
+    const drawGauge = (value: number, max = 100) => {
         const radius = 40; // Smaller radius for the gauge
         const arcWidth = 8;
         const angleScale = d3.scaleLinear()
@@ -270,16 +262,16 @@ const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
 
                     {/* Part 1 (Top Right): Price and % Change - Now in top-right */}
                     <div className="flex flex-col items-end justify-center p-2">
-                        {/* عرض سعر TON وسعر USD الحقيقيين من bubbleData */}
+                        {/* عرض سعر TON وسعر USD الحقيقيين من giftData */}
                         <p className="text-xl font-bold text-gray-100">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(bubbleData.min_price_usd)}
+                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(giftData.min_price_usd)}
                         </p>
                         <p className="text-gray-300 text-sm mb-1">
-                            {bubbleData.min_price_ton.toFixed(4)} TON
+                            {giftData.min_price_ton.toFixed(4)} TON
                         </p>
-                        {bubbleData.price_change_percentage_24h !== undefined && (
-                            <p className={`text-lg font-semibold ${bubbleData.price_change_percentage_24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                {bubbleData.price_change_percentage_24h >= 0 ? '+' : ''}{bubbleData.price_change_percentage_24h.toFixed(2)}%
+                        {giftData.price_change_percentage_24h !== undefined && (
+                            <p className={`text-lg font-semibold ${giftData.price_change_percentage_24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {giftData.price_change_percentage_24h >= 0 ? '+' : ''}{giftData.price_change_percentage_24h.toFixed(2)}%
                             </p>
                         )}
                     </div>
@@ -287,15 +279,15 @@ const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
                     {/* Part 4 (Bottom Left): Supply Data - Now in bottom-left */}
                     <div className="flex flex-col items-start justify-center p-2 text-sm">
                          {/* عرض اسم الهدية والنموذج */}
-                         <p className="text-base font-bold text-gray-100 mb-2">{bubbleData.name}</p>
+                         <p className="text-base font-bold text-gray-100 mb-2">{giftData.name}</p>
                         <div className="flex justify-between w-full mb-0.5">
                             <span className="text-gray-300">Model Name:</span>
-                            <span className="text-gray-100 font-semibold">{bubbleData.model_name}</span>
+                            <span className="text-gray-100 font-semibold">{giftData.model_name}</span>
                         </div>
-                        {bubbleData.variant_name && (
+                        {giftData.variant_name && (
                             <div className="flex justify-between w-full mb-0.5">
                                 <span className="text-gray-300">Variant Name:</span>
-                                <span className="text-gray-100 font-semibold">{bubbleData.variant_name}</span>
+                                <span className="text-gray-100 font-semibold">{giftData.variant_name}</span>
                             </div>
                         )}
                         {/* يمكنك إضافة المزيد من تفاصيل 'simulatedGiftData' هنا إذا كانت متاحة من الـ API */}
@@ -327,11 +319,11 @@ const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
 
                     {/* Part 3 (Bottom Right): Gift/Coin Image and Name - Now in bottom-right */}
                     <div className="flex flex-col items-end justify-center p-2">
-                        <img src={bubbleData.image} alt={bubbleData.name} className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover mb-2" />
+                        <img src={giftData.image} alt={giftData.name} className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover mb-2" />
                         {/* عرض اسم الهدية بشكل أوضح */}
-                        <h3 className="text-lg font-bold text-gray-100 text-right">{bubbleData.name}</h3>
-                        {bubbleData.variant_name && bubbleData.name !== bubbleData.variant_name && (
-                             <p className="text-sm text-gray-400 text-right">{bubbleData.variant_name}</p>
+                        <h3 className="text-lg font-bold text-gray-100 text-right">{giftData.name}</h3>
+                        {giftData.variant_name && giftData.name !== giftData.variant_name && (
+                             <p className="text-sm text-gray-400 text-right">{giftData.variant_name}</p>
                         )}
                     </div>
                 </div>

@@ -1,10 +1,8 @@
+    // src/components/GiftModal.tsx - إضافة التوافق
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as d3 from 'd3';
 
-// GiftModal Component: A standalone modal displaying detailed bubble information.
-// It uses Tailwind CSS for styling and includes a D3-powered chart.
-// تم تحديث الواجهة لتعكس كائن Gift الكامل القادم من App.tsx
-// يجب أن تتطابق هذه الواجهة مع الواجهة Gift المعرفة في App.tsx
+// واجهة Gift
 interface Gift {
     id: string;
     model_name: string;
@@ -21,13 +19,22 @@ interface Gift {
 }
 
 interface GiftModalProps {
-    bubbleData: Gift | null; // الآن bubbleData هو كائن Gift كامل
+    bubbleData?: Gift | null;
+    data?: Gift | null; // للتوافق مع الأسماء القديمة
     onClose: () => void;
 }
 
-const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, onClose }) => {
+const GiftModal: React.FC<GiftModalProps> = ({ bubbleData, data, onClose }) => {
+    // دعم كلا الاسمين للتوافق
+    const giftData = bubbleData || data;
+    
     const [chartTimeframe, setChartTimeframe] = useState('1D');
-    const chartRef = useRef<SVGSVGElement>(null); // تحديد نوع المرجع لـ SVGElement
+    const chartRef = useRef<SVGSVGElement>(null);
+
+    if (!giftData) return null;
+
+    // داخل useEffect الخاص بالرسم البياني، تعديل السطر:
+    .attr("d", area || ""); // إضافة fallback لمنع الأخطاء
 
     // Simulated historical data for charting
     const generateChartData = useCallback((timeframe: string) => {

@@ -1,112 +1,161 @@
 // src/services/api.ts
-const API_BASE = (import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') || 'https://physbubble-bot.onrender.com/api');
 
-function withTimeout(fetchPromise: Promise<Response>, ms: number): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), ms);
-  return fetchPromise.finally(() => clearTimeout(timeoutId));
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+export interface Gift {
+  id: string;
+  model_name: string;
+  variant_name?: string;
+  min_price_ton: number;
+  min_price_usd: number;
+  image: string;
+  name: string;
+  symbol: string;
+  market_cap: number;
+  current_price: number;
+  price_change_percentage_24h?: number;
+  isBot?: boolean;
 }
 
-function setCache(key: string, data: any, ttlSeconds: number) {
-  const payload = {
-    ts: Date.now(),
-    ttl: ttlSeconds * 1000,
-    data
-  };
-  localStorage.setItem(key, JSON.stringify(payload));
+export interface GiftsResponse {
+  gifts: Gift[];
+  ton_price: number;
+  timestamp: number;
+  last_updated: string;
+  total_items: number;
+  valid_items: number;
+  success_rate: string;
+  is_stale: boolean;
+  source: string;
 }
 
-function getCache(key: string): any {
-  const raw = localStorage.getItem(key);
-  if (!raw) return null;
-  
-  try {
-    const parsed = JSON.parse(raw);
-    if (Date.now() - parsed.ts < parsed.ttl) {
-      return parsed.data;
-    }
-    localStorage.removeItem(key);
-    return null;
-  } catch {
-    localStorage.removeItem(key);
-    return null;
-  }
+export interface CollectionsResponse {
+  collections: Collection[];
+  total_collections: number;
+  timestamp: number;
+  last_updated: string;
+  is_stale: boolean;
+  source: string;
 }
 
 export interface Collection {
   name: string;
-  // يمكن إضافة حقول أخرى إذا كانت موجودة في API
+  image_url?: string;
+  count: number;
+  floor: string;
 }
 
-export async function fetchCollections(): Promise<string[]> {
-  const CACHE_KEY = 'phys_collections_v1';
-  const cached = getCache(CACHE_KEY);
-  if (cached) return cached;
-
-  const url = `${API_BASE}/collections`;
+// دالة لجلب البيانات من الكاش فقط (سريعة)
+export async function fetchCachedGiftPrices(collections: string[]): Promise<GiftsResponse> {
   try {
-    const res = await withTimeout(fetch(url, { method: 'GET' }), 5000);
+    const startTime = performance.now();
+    const q = encodeURIComponent(collections.join(","));
+    const res = await fetch(`${API_BASE_URL}/api/gifts/cache?target_items=${q}`);
     
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      throw new Error(`فشل في جلب الكاش: ${res.status} ${res.statusText}`);
     }
     
-    const json = await res.json();
+    const data = await res.json();
+    const responseTime = performance.now() - startTime;
+    console.log(`⏱️ وقت استجابة الكاش: ${responseTime.toFixed(0)}ms`);
     
-    // محاولة استخراج المجموعات بطرق مختلفة للتوافق
-    let collections: string[] = [];
-    
-    if (Array.isArray(json)) {
-      // إذا كان الرد مصفوفة مباشرة
-      collections = json.map(item => typeof item === 'string' ? item : item.name);
-    } else if (json.collections && Array.isArray(json.collections)) {
-      // إذا كان الرد يحتوي على خاصية collections
-      collections = json.collections.map((item: any) => typeof item === 'string' ? item : item.name);
-    } else if (json.gift_models && Array.isArray(json.gift_models)) {
-      // إذا كان الرد يحتوي على gift_models
-      collections = json.gift_models.map((item: any) => typeof item === 'string' ? item : item.name);
-    }
-    
-    // تصفية القيم غير الصالحة
-    collections = collections.filter((item): item is string => 
-      typeof item === 'string' && item.trim() !== ''
-    );
-    
-    if (collections.length > 0) {
-      setCache(CACHE_KEY, collections, 300); // 5 دقائق
-    }
-    
-    return collections;
-  } catch (err) {
-    console.error('Failed to fetch collections:', err);
-    throw err;
+    return data;
+  } catch (error) {
+    console.warn('فشل جلب البيانات من الكاش، جاري المحاولة بالطريقة العادية', error);
+    // Fallback إلى الطريقة العادية
+    return fetchGiftPrices(collections);
   }
 }
 
-export async function fetchGiftPrices(collections: string[]): Promise<any> {
-  if (collections.length === 0) {
-    return { gifts: [] };
-  }
-  
-  const cacheKey = `phys_gifts_${collections.sort().join(',')}`;
-  const cached = getCache(cacheKey);
-  if (cached) return cached;
-
-  const query = collections.map(col => encodeURIComponent(col)).join(',');
-  const url = `${API_BASE}/gifts?target_items=${query}`;
-  
+// دالة لجلب البيانات العادية (مع تحديث خلفي)
+export async function fetchGiftPrices(collections: string[]): Promise<GiftsResponse> {
   try {
-    const res = await withTimeout(fetch(url, { method: 'GET' }), 10000);
+    const startTime = performance.now();
+    const q = encodeURIComponent(collections.join(","));
+    const res = await fetch(`${API_BASE_URL}/api/gifts?target_items=${q}&allow_stale=true`);
     
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      throw new Error(`فشل في جلب البيانات: ${res.status} ${res.statusText}`);
     }
     
-    const json = await res.json();
-    setCache(cacheKey, json, 60); // 1 دقيقة
-    return json;
-  } catch (err) {
-    console.error('Failed to fetch gift prices:', err);
-    throw err;
+    const data = await res.json();
+    const responseTime = performance.now() - startTime;
+    console.log(`⏱️ وقت استجابة API: ${responseTime.toFixed(0)}ms, المصدر: ${data.source}`);
+    
+    return data;
+  } catch (error) {
+    console.error('فشل جلب بيانات الهدايا:', error);
+    throw error;
+  }
+}
+
+// دالة لجلب قائمة المجموعات من الكاش
+export async function fetchCachedCollections(): Promise<CollectionsResponse> {
+  try {
+    const startTime = performance.now();
+    const res = await fetch(`${API_BASE_URL}/api/collections?use_cache=true`);
+    
+    if (!res.ok) {
+      throw new Error(`فشل في جلب المجموعات من الكاش: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const responseTime = performance.now() - startTime;
+    console.log(`⏱️ وقت استجابة مجموعات الكاش: ${responseTime.toFixed(0)}ms`);
+    
+    return data;
+  } catch (error) {
+    console.warn('فشل جلب المجموعات من الكاش، جاري المحاولة بالطريقة العادية', error);
+    return fetchCollections();
+  }
+}
+
+// دالة لجلب قائمة المجموعات العادية
+export async function fetchCollections(): Promise<CollectionsResponse> {
+  try {
+    const startTime = performance.now();
+    const res = await fetch(`${API_BASE_URL}/api/collections`);
+    
+    if (!res.ok) {
+      throw new Error(`فشل في جلب المجموعات: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const responseTime = performance.now() - startTime;
+    console.log(`⏱️ وقت استجابة المجموعات: ${responseTime.toFixed(0)}ms, المصدر: ${data.source}`);
+    
+    return data;
+  } catch (error) {
+    console.error('فشل جلب قائمة المجموعات:', error);
+    throw error;
+  }
+}
+
+// دالة لفحص صحة API
+export async function checkAPIHealth(): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/health`);
+    if (!res.ok) {
+      throw new Error(`API غير صحي: ${res.status}`);
+    }
+    return await res.json();
+  } catch (error) {
+    console.error('فشل فحص صحة API:', error);
+    throw error;
+  }
+}
+
+// دالة للحصول على حالة النظام
+export async function getSystemStatus(): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/status`);
+    if (!res.ok) {
+      throw new Error(`فشل جلب حالة النظام: ${res.status}`);
+    }
+    return await res.json();
+  } catch (error) {
+    console.error('فشل جلب حالة النظام:', error);
+    throw error;
   }
 }

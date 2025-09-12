@@ -1,8 +1,8 @@
-  // src/App.tsx - التعديلات الرئيسية
+// src/App.tsx - التعديلات الرئيسية
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import BubbleCanvas from './components/BubbleCanvas';
 import GiftModal from './components/GiftModal';
-import { fetchCollections, fetchGiftPrices } from './services/api'; // استيراد دوال الخدمة
+import { fetchCachedGiftPrices, fetchGiftPrices, fetchCachedCollections, fetchCollections } from './services/api'; // استيراد دوال الخدمة
 
 // SVG Icons (تبقى كما هي)
 const LuEye = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>;
@@ -61,6 +61,7 @@ const App = () => {
     const [selectedTimeframe, setSelectedTimeframe] = useState('Day');
     const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null); 
     const [collections, setCollections] = useState<string[]>([]);
+    const [dataSource, setDataSource] = useState<'cache' | 'live' | 'stale'>('cache'); // تتبع مصدر البيانات
 
     // جلب قائمة المجموعات من API
     const fetchCollectionsData = useCallback(async () => {
@@ -68,11 +69,25 @@ const App = () => {
             setCollectionsLoading(true);
             setCollectionsError(null);
             
-            const collectionsData = await fetchCollections();
+            let collectionsData;
+            try {
+                // محاولة استخدام الكاش أولاً للحصول على استجابة سريعة
+                console.log('🔍 جلب قائمة المجموعات من الكاش...');
+                const cachedResponse = await fetchCachedCollections();
+                collectionsData = cachedResponse.collections;
+                console.log('✅ تم جلب المجموعات من الكاش بنجاح:', collectionsData.length);
+                setDataSource('cache');
+            } catch (cacheError) {
+                console.warn('⚠️ فشل جلب المجموعات من الكاش، جاري المحاولة بالطريقة العادية', cacheError);
+                const liveResponse = await fetchCollections();
+                collectionsData = liveResponse.collections;
+                setDataSource(liveResponse.is_stale ? 'stale' : 'live');
+            }
             
             if (collectionsData && collectionsData.length > 0) {
-                setCollections(collectionsData);
-                console.log('تم جلب المجموعات بنجاح:', collectionsData);
+                const collectionNames = collectionsData.map((col: any) => col.name);
+                setCollections(collectionNames);
+                console.log('تم جلب المجموعات بنجاح:', collectionNames.length);
             } else {
                 // استخدام القائمة الافتراضية إذا كانت الاستجابة فارغة
                 console.warn('استجابة API للمجموعات فارغة، استخدام القائمة الافتراضية');
@@ -91,15 +106,36 @@ const App = () => {
         }
     }, []);
 
-    const fetchGiftsData = useCallback(async () => {
+    const fetchGiftsData = useCallback(async (useCache: boolean = true) => {
         if (collections.length === 0) return;
 
         try {
             setLoading(true);
             setError(null);
 
-            // جلب بيانات الهدايا من API
-            const apiData = await fetchGiftPrices(collections);
+            let apiData;
+            let dataSource: 'cache' | 'live' | 'stale' = 'cache';
+            
+            if (useCache) {
+                // محاولة استخدام الكاش أولاً للحصول على استجابة سريعة
+                try {
+                    console.log('🔍 جلب الهدايا من الكاش...');
+                    apiData = await fetchCachedGiftPrices(collections);
+                    console.log('✅ تم جلب الهدايا من الكاش بنجاح:', apiData.gifts.length);
+                    dataSource = apiData.is_stale ? 'stale' : 'cache';
+                } catch (cacheError) {
+                    console.warn('⚠️ فشل جلب الهدايا من الكاش، جاري المحاولة بالطريقة العادية', cacheError);
+                    apiData = await fetchGiftPrices(collections);
+                    dataSource = apiData.is_stale ? 'stale' : 'live';
+                }
+            } else {
+                // الطريقة العادية مع تحديث خلفي
+                console.log('🔄 جلب بيانات محدثة من الخادم...');
+                apiData = await fetchGiftPrices(collections);
+                dataSource = apiData.is_stale ? 'stale' : 'live';
+            }
+
+            setDataSource(dataSource);
             console.log('API response:', apiData);
 
             // محاكاة هيكل البيانات القديم من API الجديد
@@ -196,8 +232,14 @@ const App = () => {
 
     useEffect(() => {
         if (collections.length > 0 && !collectionsLoading) {
-            fetchGiftsData();
-            const interval = setInterval(fetchGiftsData, 300000); // 5 دقائق
+            // جلب البيانات من الكاش أولاً لعرض سريع
+            fetchGiftsData(true);
+            
+            const interval = setInterval(() => {
+                // تحديث البيانات في الخلفية
+                fetchGiftsData(false);
+            }, 300000); // 5 دقائق
+            
             return () => clearInterval(interval);
         }
     }, [fetchGiftsData, collections, collectionsLoading]);
@@ -263,6 +305,7 @@ const App = () => {
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-300 mx-auto"></div>
                     <p className="mt-4 text-xl">جاري تحميل بيانات الهدايا...</p>
+                    <p className="text-sm text-gray-400 mt-2">يتم استخدام البيانات المخبأة لأسرع تجربة</p>
                 </div>
             </div>
         );
@@ -358,6 +401,19 @@ const App = () => {
                 </div>
             </div>
             
+            {/* مؤشر مصدر البيانات */}
+            <div className="w-full text-center mb-1">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                    dataSource === 'cache' ? 'bg-green-500 text-white' :
+                    dataSource === 'stale' ? 'bg-yellow-500 text-black' :
+                    'bg-blue-500 text-white'
+                }`}>
+                    {dataSource === 'cache' ? 'بيانات مخبأة ✓' :
+                     dataSource === 'stale' ? 'بيانات قديمة ⚡' :
+                     'بيانات حية 🔄'}
+                </span>
+            </div>
+
             <BubbleCanvas
                 cryptoData={filteredGifts}
                 loading={loading}

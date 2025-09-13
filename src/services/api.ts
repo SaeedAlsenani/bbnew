@@ -1,6 +1,7 @@
 // src/services/api.ts
 
-console.log('API Base URL:', import.meta.env.VITE_API_BASE_URL); // للتdebug
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api$/, '');
+console.log('API Base URL:', API_BASE_URL);
 
 export interface Gift {
   id: string;

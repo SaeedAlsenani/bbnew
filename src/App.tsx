@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import BubbleCanvas from './components/BubbleCanvas';
 import GiftModal from './components/GiftModal';
-import { fetchCachedGiftPrices, fetchGiftPrices, fetchCachedCollections, fetchCollections } from './services/api'; // استيراد دوال الخدمة
+import { fetchCachedGiftPrices, fetchGiftPrices, fetchCachedCollections, fetchCollections } from './services/api';
 
 // SVG Icons (تبقى كما هي)
 const LuEye = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>;
@@ -113,119 +113,131 @@ const App = () => {
             setLoading(true);
             setError(null);
 
+            // إنشاء هدايا placeholder أولية لكل مجموعة
+            const placeholderGifts = collections.map(collection => ({
+                id: `placeholder_${collection}`,
+                model_name: collection,
+                name: collection,
+                min_price_ton: 0,
+                min_price_usd: 0,
+                image: '',
+                symbol: collection.substring(0, 3).toUpperCase(),
+                market_cap: 0,
+                current_price: 0,
+                is_valid: false,
+                isLoading: true // وضع التحميل نشط
+            }));
+
+            setGiftsData(placeholderGifts);
+            setSelectedGifts(placeholderGifts.map(g => g.id));
+
             let apiData;
-            let dataSource: 'cache' | 'live' | 'stale' = 'cache';
-            
             if (useCache) {
-                // محاولة استخدام الكاش أولاً للحصول على استجابة سريعة
                 try {
-                    console.log('🔍 جلب الهدايا من الكاش...');
                     apiData = await fetchCachedGiftPrices(collections);
                     console.log('✅ تم جلب الهدايا من الكاش بنجاح:', apiData.gifts.length);
-                    dataSource = apiData.is_stale ? 'stale' : 'cache';
                 } catch (cacheError) {
-                    console.warn('⚠️ فشل جلب الهدايا من الكاش، جاري المحاولة بالطريقة العادية', cacheError);
+                    console.warn('فشل جلب الهدايا من الكاش، جاري المحاولة بالطريقة العادية', cacheError);
                     apiData = await fetchGiftPrices(collections);
-                    dataSource = apiData.is_stale ? 'stale' : 'live';
                 }
             } else {
-                // الطريقة العادية مع تحديث خلفي
-                console.log('🔄 جلب بيانات محدثة من الخادم...');
                 apiData = await fetchGiftPrices(collections);
-                dataSource = apiData.is_stale ? 'stale' : 'live';
             }
 
-            setDataSource(dataSource);
             console.log('API response:', apiData);
 
-            // محاكاة هيكل البيانات القديم من API الجديد
-            const mockMinGiftResponse = {
-                min_price_gift: apiData.gifts && apiData.gifts.length > 0 ? {
-                    id: apiData.gifts[0].id,
-                    name: apiData.gifts[0].name,
-                    price_ton: apiData.gifts[0].price_ton,
-                    price_usd: apiData.gifts[0].price_usd,
-                    image: apiData.gifts[0].image
-                } : undefined,
-                ton_price: apiData.ton_price,
-                timestamp: apiData.timestamp,
-                last_updated: new Date().toISOString(),
-                _sort_order: "min_price_usd_asc",
-                total_models: apiData.total_items || 0,
-                success_rate: apiData.success_rate || "100%"
-            };
-
-            const mockAllGiftsResponse = {
-                gift_models_min_prices: apiData.gifts ? apiData.gifts.map((gift: any) => ({
-                    model_name: gift.collection || gift.model_name || 'Unknown',
-                    min_price_ton: gift.price_ton,
-                    min_price_usd: gift.price_usd,
-                    image: gift.image,
-                    variant_id: gift.id || gift.variant_id,
-                    variant_name: gift.name || gift.variant_name,
-                    is_valid: gift.is_valid !== undefined ? gift.is_valid : true
-                })) : [],
-                ton_price: apiData.ton_price,
-                timestamp: apiData.timestamp,
-                last_updated: apiData.last_updated,
-                _sort_order: "min_price_usd_asc",
-                total_models: apiData.total_items || 0,
-                success_rate: apiData.success_rate || "100%"
-            };
-
-            // معالجة استجابة min_gift
-            console.log('Mock Min Gift response:', mockMinGiftResponse);
-
-            if (mockMinGiftResponse && mockMinGiftResponse.min_price_gift) {
-                setOverallMinGift({
-                    id: mockMinGiftResponse.min_price_gift.id || 'overall_min',
-                    name: mockMinGiftResponse.min_price_gift.name || 'أرخص هدية',
-                    model_name: mockMinGiftResponse.min_price_gift.name || 'أرخص هدية',
-                    min_price_ton: mockMinGiftResponse.min_price_gift.price_ton,
-                    min_price_usd: mockMinGiftResponse.min_price_gift.price_usd,
-                    image: mockMinGiftResponse.min_price_gift.image || 'https://placehold.co/60x60/333/FFF?text=Gift',
-                    symbol: (mockMinGiftResponse.min_price_gift.name || 'ARG').substring(0, 3).toUpperCase(),
-                    market_cap: mockMinGiftResponse.min_price_gift.price_usd,
-                    current_price: mockMinGiftResponse.min_price_gift.price_usd,
-                    price_change_percentage_24h: Math.random() > 0.5 ? Math.random() * 10 : Math.random() * -10
-                });
-            } else {
-                setOverallMinGift(null);
-            }
-            setTonPrice(mockMinGiftResponse.ton_price);
-
-            // معالجة استجابة models
-            console.log('Mock All Gifts response:', mockAllGiftsResponse);
-            
-            const transformedGifts: Gift[] = mockAllGiftsResponse.gift_models_min_prices
+            // معالجة البيانات المستلمة من API
+            const transformedGifts: Gift[] = apiData.gifts
                 .filter((gift: any) => gift.is_valid)
                 .map((gift: any) => ({
-                    id: gift.variant_id || gift.model_name,
+                    id: gift.id || gift.model_name,
                     model_name: gift.model_name,
                     variant_name: gift.variant_name,
-                    name: gift.variant_name || gift.model_name,
-                    min_price_ton: gift.min_price_ton,
-                    min_price_usd: gift.min_price_usd,
+                    name: gift.name || gift.model_name,
+                    min_price_ton: gift.price_ton || gift.min_price_ton || 0,
+                    min_price_usd: gift.price_usd || gift.min_price_usd || 0,
                     image: gift.image || 'https://placehold.co/60x60/333/FFF?text=Gift',
                     symbol: (gift.model_name || 'Unknown').substring(0, 3).toUpperCase(),
-                    market_cap: gift.min_price_usd,
-                    current_price: gift.min_price_usd,
+                    market_cap: gift.min_price_usd || 0,
+                    current_price: gift.min_price_usd || 0,
                     price_change_percentage_24h: Math.random() > 0.5 ? 
                         Math.random() * 10 : 
-                        Math.random() * -10
+                        Math.random() * -10,
+                    is_valid: true,
+                    isLoading: false
                 }));
+
+            // دمج الهدايا الحقيقية مع الـ placeholders للعناصر غير المحملة
+            const finalGifts = collections.map(collection => {
+                const realGift = transformedGifts.find(g => g.model_name === collection);
+                if (realGift) {
+                    return realGift;
+                }
+                // إذا لم يتم تحميل الهدية بعد، نعيد placeholder
+                return {
+                    id: `placeholder_${collection}`,
+                    model_name: collection,
+                    name: collection,
+                    min_price_ton: 0,
+                    min_price_usd: 0,
+                    image: '',
+                    symbol: collection.substring(0, 3).toUpperCase(),
+                    market_cap: 0,
+                    current_price: 0,
+                    price_change_percentage_24h: 0,
+                    is_valid: false,
+                    isLoading: true
+                };
+            });
+
+            setGiftsData(finalGifts);
+            setSelectedGifts(finalGifts.map(g => g.id));
+
+            // معالجة overallMinGift إذا كانت البيانات متاحة
+            if (transformedGifts.length > 0) {
+                const validGifts = transformedGifts.filter(g => g.is_valid && g.min_price_usd > 0);
+                if (validGifts.length > 0) {
+                    const minGift = validGifts.reduce((min, gift) => 
+                        gift.min_price_usd < min.min_price_usd ? gift : min
+                    );
+                    
+                    setOverallMinGift({
+                        ...minGift,
+                        id: minGift.id || 'overall_min',
+                        name: minGift.name || 'أرخص هدية'
+                    });
+                }
+            }
             
-            setGiftsData(transformedGifts);
-            setSelectedGifts(transformedGifts.map(g => g.id));
+            setTonPrice(apiData.ton_price);
 
         } catch (err: any) {
             console.error("فشل في جلب بيانات الهدايا:", err);
             setError(`فشل في جلب بيانات الهدايا: ${err.message}. يرجى التأكد من أن الـ API يعمل بشكل صحيح.`);
+            
+            // في حالة الخطأ، نعرض الـ placeholders فقط
+            const errorPlaceholders = collections.map(collection => ({
+                id: `error_${collection}`,
+                model_name: collection,
+                name: collection,
+                min_price_ton: 0,
+                min_price_usd: 0,
+                image: '',
+                symbol: collection.substring(0, 3).toUpperCase(),
+                market_cap: 0,
+                current_price: 0,
+                is_valid: false,
+                isLoading: false,
+                error: true
+            }));
+            
+            setGiftsData(errorPlaceholders);
+            setSelectedGifts(errorPlaceholders.map(g => g.id));
         } finally {
             setLoading(false);
         }
     }, [collections]);
-
+  
     useEffect(() => {
         fetchCollectionsData();
     }, [fetchCollectionsData]);
@@ -244,10 +256,16 @@ const App = () => {
         }
     }, [fetchGiftsData, collections, collectionsLoading]);
 
+    // تعديل دالة التصفية لاستبعاد الهدايا غير الصالحة من العرض
     const filteredGifts = useMemo(() => 
         giftsData.filter(gift => selectedGifts.includes(gift.id)),
         [giftsData, selectedGifts]
     );
+
+    // دالة مساعدة لتحديد إذا كانت الهدية محملة
+    const isGiftLoaded = (gift: Gift) => {
+        return gift.is_valid && gift.min_price_usd > 0 && !gift.isLoading;
+    };
 
     const handleFilterChange = (giftId: string) => {
         setSelectedGifts(prevSelected => 

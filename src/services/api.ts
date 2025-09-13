@@ -1,7 +1,5 @@
 // src/services/api.ts
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api$/, '');
-
 export interface Gift {
   id: string;
   model_name: string;
@@ -15,6 +13,8 @@ export interface Gift {
   current_price: number;
   price_change_percentage_24h?: number;
   isBot?: boolean;
+  is_valid?: boolean; // إضافة حقل is_valid
+  isLoading?: boolean; // حقل جديد للإشارة إلى حالة التحميل
 }
 
 export interface GiftsResponse {

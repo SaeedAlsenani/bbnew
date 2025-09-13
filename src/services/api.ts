@@ -1,5 +1,7 @@
 // src/services/api.ts
 
+console.log('API Base URL:', import.meta.env.VITE_API_BASE_URL); // للتdebug
+
 export interface Gift {
   id: string;
   model_name: string;

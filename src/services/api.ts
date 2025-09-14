@@ -16,8 +16,9 @@ export interface Gift {
   current_price: number;
   price_change_percentage_24h?: number;
   isBot?: boolean;
-  is_valid?: boolean; // إضافة حقل is_valid
-  isLoading?: boolean; // حقل جديد للإشارة إلى حالة التحميل
+  is_valid?: boolean;
+  isLoading?: boolean;
+  isPlaceholder?: boolean;
 }
 
 export interface GiftsResponse {
@@ -61,7 +62,17 @@ export async function fetchCachedGiftPrices(collections: string[]): Promise<Gift
     
     const data = await res.json();
     const responseTime = performance.now() - startTime;
-    console.log(`⏱️ وقت استجابة الكاش: ${responseTime.toFixed(0)}ms`);
+    console.log(`⏱️ وقت استجابة الكاش: ${responseTime.toFixed(0)}ms, المصدر: ${data.source}`);
+    
+    // معالجة البيانات الوهمية
+    if (data.source === 'placeholder' || data.source === 'empty_cache') {
+      console.warn('⚠️ تم استقبال بيانات وهمية من الكاش');
+      data.gifts = data.gifts.map((gift: any) => ({
+        ...gift,
+        isLoading: true,
+        isPlaceholder: true
+      }));
+    }
     
     return data;
   } catch (error) {
@@ -86,10 +97,47 @@ export async function fetchGiftPrices(collections: string[]): Promise<GiftsRespo
     const responseTime = performance.now() - startTime;
     console.log(`⏱️ وقت استجابة API: ${responseTime.toFixed(0)}ms, المصدر: ${data.source}`);
     
+    // معالجة البيانات الوهمية
+    if (data.source === 'placeholder' || data.source === 'fallback') {
+      console.warn('⚠️ تم استقبال بيانات وهمية من API');
+      data.gifts = data.gifts.map((gift: any) => ({
+        ...gift,
+        isLoading: true,
+        isPlaceholder: true
+      }));
+    }
+    
     return data;
   } catch (error) {
     console.error('فشل جلب بيانات الهدايا:', error);
-    throw error;
+    
+    // إنشاء استجابة وهمية في حالة الخطأ
+    const placeholderResponse: GiftsResponse = {
+      gifts: collections.map(collection => ({
+        id: `error_${collection}`,
+        model_name: collection,
+        name: collection,
+        min_price_ton: 0,
+        min_price_usd: 0,
+        image: '',
+        symbol: collection.substring(0, 3).toUpperCase(),
+        market_cap: 0,
+        current_price: 0,
+        is_valid: false,
+        isLoading: false,
+        isPlaceholder: true
+      })),
+      ton_price: 2.50, // سعر افتراضي
+      timestamp: Date.now(),
+      last_updated: new Date().toISOString(),
+      total_items: collections.length,
+      valid_items: 0,
+      success_rate: "0%",
+      is_stale: true,
+      source: "error_fallback"
+    };
+    
+    return placeholderResponse;
   }
 }
 
@@ -131,7 +179,18 @@ export async function fetchCollections(): Promise<CollectionsResponse> {
     return data;
   } catch (error) {
     console.error('فشل جلب قائمة المجموعات:', error);
-    throw error;
+    
+    // إنشاء استجابة وهمية في حالة الخطأ
+    const placeholderResponse: CollectionsResponse = {
+      collections: [],
+      total_collections: 0,
+      timestamp: Date.now(),
+      last_updated: new Date().toISOString(),
+      is_stale: true,
+      source: "error_fallback"
+    };
+    
+    return placeholderResponse;
   }
 }
 

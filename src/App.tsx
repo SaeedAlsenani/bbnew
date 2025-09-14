@@ -24,6 +24,9 @@ interface Gift {
   current_price: number;
   price_change_percentage_24h?: number;
   isBot?: boolean;
+  is_valid?: boolean;
+  isLoading?: boolean;
+  isPlaceholder?: boolean;
 }
 
 // قائمة المجموعات الافتراضية كاحتياطي
@@ -62,7 +65,8 @@ const App = () => {
     const [selectedTimeframe, setSelectedTimeframe] = useState('Day');
     const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null); 
     const [collections, setCollections] = useState<string[]>([]);
-    const [dataSource, setDataSource] = useState<'cache' | 'live' | 'stale'>('cache'); // تتبع مصدر البيانات
+    const [dataSource, setDataSource] = useState<'cache' | 'live' | 'stale' | 'placeholder'>('cache');
+    const [hasPlaceholderData, setHasPlaceholderData] = useState(false);
 
     // جلب قائمة المجموعات من API
     const fetchCollectionsData = useCallback(async () => {
@@ -113,6 +117,7 @@ const App = () => {
         try {
             setLoading(true);
             setError(null);
+            setHasPlaceholderData(false);
 
             // إنشاء هدايا placeholder أولية لكل مجموعة
             const placeholderGifts = collections.map(collection => ({
@@ -126,55 +131,68 @@ const App = () => {
                 market_cap: 0,
                 current_price: 0,
                 is_valid: false,
-                isLoading: true // وضع التحميل نشط
+                isLoading: true,
+                isPlaceholder: true
             }));
 
             setGiftsData(placeholderGifts);
             setSelectedGifts(placeholderGifts.map(g => g.id));
 
             let apiData;
+            let dataSourceType: 'cache' | 'live' | 'stale' | 'placeholder' = 'cache';
+            
             if (useCache) {
                 try {
                     apiData = await fetchCachedGiftPrices(collections);
                     console.log('✅ تم جلب الهدايا من الكاش بنجاح:', apiData.gifts.length);
+                    dataSourceType = apiData.source === 'placeholder' ? 'placeholder' : 'cache';
                 } catch (cacheError) {
                     console.warn('فشل جلب الهدايا من الكاش، جاري المحاولة بالطريقة العادية', cacheError);
                     apiData = await fetchGiftPrices(collections);
+                    dataSourceType = apiData.source === 'placeholder' ? 'placeholder' : 'live';
                 }
             } else {
                 apiData = await fetchGiftPrices(collections);
+                dataSourceType = apiData.source === 'placeholder' ? 'placeholder' : 'live';
             }
 
             console.log('API response:', apiData);
+            setDataSource(dataSourceType);
+
+            // التحقق من وجود بيانات وهمية
+            if (apiData.source === 'placeholder' || apiData.gifts.some((g: any) => 
+                g.price_usd === 0 || g.min_price_usd === 0 || !g.is_valid)) {
+                setHasPlaceholderData(true);
+            }
 
             // معالجة البيانات المستلمة من API
             const transformedGifts: Gift[] = apiData.gifts
-                .filter((gift: any) => gift.is_valid)
                 .map((gift: any) => ({
-                    id: gift.id || gift.model_name,
-                    model_name: gift.model_name,
+                    id: gift.id || gift.model_name || `gift_${Math.random()}`,
+                    model_name: gift.model_name || gift.name || 'Unknown',
                     variant_name: gift.variant_name,
-                    name: gift.name || gift.model_name,
+                    name: gift.name || gift.model_name || 'هدية',
                     min_price_ton: gift.price_ton || gift.min_price_ton || 0,
                     min_price_usd: gift.price_usd || gift.min_price_usd || 0,
                     image: gift.image || 'https://placehold.co/60x60/333/FFF?text=Gift',
-                    symbol: (gift.model_name || 'Unknown').substring(0, 3).toUpperCase(),
+                    symbol: (gift.model_name || gift.name || 'Unknown').substring(0, 3).toUpperCase(),
                     market_cap: gift.min_price_usd || 0,
                     current_price: gift.min_price_usd || 0,
                     price_change_percentage_24h: Math.random() > 0.5 ? 
                         Math.random() * 10 : 
                         Math.random() * -10,
-                    is_valid: true,
-                    isLoading: false
+                    is_valid: gift.is_valid !== undefined ? gift.is_valid : true,
+                    isLoading: apiData.source === 'placeholder' || gift.price_usd === 0 || gift.min_price_usd === 0,
+                    isPlaceholder: apiData.source === 'placeholder' || gift.price_usd === 0 || gift.min_price_usd === 0
                 }));
 
             // دمج الهدايا الحقيقية مع الـ placeholders للعناصر غير المحملة
             const finalGifts = collections.map(collection => {
                 const realGift = transformedGifts.find(g => g.model_name === collection);
-                if (realGift) {
+                if (realGift && realGift.is_valid && realGift.min_price_usd > 0) {
                     return realGift;
                 }
-                // إذا لم يتم تحميل الهدية بعد، نعيد placeholder
+                // إذا لم يتم تحميل الهدية بعد أو كانت غير صالحة، نعيد placeholder
                 return {
                     id: `placeholder_${collection}`,
                     model_name: collection,
@@ -187,7 +205,8 @@ const App = () => {
                     current_price: 0,
                     price_change_percentage_24h: 0,
                     is_valid: false,
-                    isLoading: true
+                    isLoading: true,
+                    isPlaceholder: true
                 };
             });
 
@@ -195,19 +214,19 @@ const App = () => {
             setSelectedGifts(finalGifts.map(g => g.id));
 
             // معالجة overallMinGift إذا كانت البيانات متاحة
-            if (transformedGifts.length > 0) {
-                const validGifts = transformedGifts.filter(g => g.is_valid && g.min_price_usd > 0);
-                if (validGifts.length > 0) {
-                    const minGift = validGifts.reduce((min, gift) => 
-                        gift.min_price_usd < min.min_price_usd ? gift : min
-                    );
-                    
-                    setOverallMinGift({
-                        ...minGift,
-                        id: minGift.id || 'overall_min',
-                        name: minGift.name || 'أرخص هدية'
-                    });
-                }
+            const validGifts = transformedGifts.filter(g => g.is_valid && g.min_price_usd > 0);
+            if (validGifts.length > 0) {
+                const minGift = validGifts.reduce((min, gift) => 
+                    gift.min_price_usd < min.min_price_usd ? gift : min
+                );
+                
+                setOverallMinGift({
+                    ...minGift,
+                    id: minGift.id || 'overall_min',
+                    name: minGift.name || 'أرخص هدية'
+                });
+            } else {
+                setOverallMinGift(null);
             }
             
             setTonPrice(apiData.ton_price);
@@ -215,6 +234,7 @@ const App = () => {
         } catch (err: any) {
             console.error("فشل في جلب بيانات الهدايا:", err);
             setError(`فشل في جلب بيانات الهدايا: ${err.message}. يرجى التأكد من أن الـ API يعمل بشكل صحيح.`);
+            setHasPlaceholderData(true);
             
             // في حالة الخطأ، نعرض الـ placeholders فقط
             const errorPlaceholders = collections.map(collection => ({
@@ -229,7 +249,7 @@ const App = () => {
                 current_price: 0,
                 is_valid: false,
                 isLoading: false,
-                error: true
+                isPlaceholder: true
             }));
             
             setGiftsData(errorPlaceholders);
@@ -309,38 +329,6 @@ const App = () => {
                     <p>{collectionsError}</p>
                     <p className="mt-4 text-sm text-red-200">
                         تم استخدام قائمة افتراضية كاحتياطي.
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-gray-900 text-gray-100 font-sans">
-                <style>
-                    {`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');`}
-                </style>
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-300 mx-auto"></div>
-                    <p className="mt-4 text-xl">جاري تحميل بيانات الهدايا...</p>
-                    <p className="text-sm text-gray-400 mt-2">يتم استخدام البيانات المخبأة لأسرع تجربة</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-red-800 text-white font-sans p-4">
-                <style>
-                    {`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');`}
-                </style>
-                 <div className="text-center bg-red-900 p-6 rounded-lg shadow-xl">
-                    <p className="text-xl font-bold mb-4">خطأ في جلب البيانات:</p>
-                    <p>{error}</p>
-                    <p className="mt-4 text-sm text-red-200">
-                        الرجاء التأكد من أن الـ API يعمل بشكل صحيح.
                     </p>
                 </div>
             </div>
@@ -452,12 +440,20 @@ const App = () => {
                 <span className={`text-xs px-2 py-1 rounded-full ${
                     dataSource === 'cache' ? 'bg-green-500 text-white' :
                     dataSource === 'stale' ? 'bg-yellow-500 text-black' :
+                    dataSource === 'placeholder' ? 'bg-gray-500 text-white' :
                     'bg-blue-500 text-white'
                 }`}>
                     {dataSource === 'cache' ? 'بيانات مخبأة ✓' :
                      dataSource === 'stale' ? 'بيانات قديمة ⚡' :
+                     dataSource === 'placeholder' ? 'بيانات وهمية ⏳' :
                      'بيانات حية 🔄'}
                 </span>
+                
+                {hasPlaceholderData && (
+                    <div className="mt-1 text-xs text-yellow-300 bg-yellow-900/30 px-2 py-1 rounded">
+                        ⚠️ بعض البيانات لا تزال قيد التحميل...
+                    </div>
+                )}
             </div>
 
             <BubbleCanvas

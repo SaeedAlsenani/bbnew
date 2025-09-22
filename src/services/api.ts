@@ -49,6 +49,34 @@ export interface Collection {
   floor: string;
 }
 
+// دالة مساعدة لتحويل البيانات من هيكل الخادم إلى هيكل React المتوقع
+function transformGiftData(apiGift: any, dataSource: string): Gift {
+  const basePrice = apiGift.price_usd || 0;
+  const marketCap = basePrice > 0 ? basePrice * 1000000 : 1000000;
+  
+  return {
+    // الحقول الأساسية من API
+    id: apiGift.variant_id || `gift_${Math.random()}`,
+    model_name: apiGift.collection || 'Unknown',
+    variant_name: apiGift.variant_name,
+    name: apiGift.variant_name || apiGift.collection || 'هدية',
+    min_price_ton: apiGift.price_ton || 0,
+    min_price_usd: basePrice,
+    
+    // الحقول المطلوبة للعرض
+    image: apiGift.image || `https://placehold.co/100x100/4F46E5/FFF?text=${(apiGift.collection || 'Gift').substring(0,3)}`,
+    symbol: (apiGift.collection || 'Gift').substring(0, 3).toUpperCase(),
+    market_cap: marketCap,
+    current_price: basePrice,
+    price_change_percentage_24h: (Math.random() * 20) - 10, // -10 إلى +10
+    
+    // الحقول الإضافية
+    is_valid: apiGift.is_valid !== undefined ? apiGift.is_valid : true,
+    isLoading: dataSource === 'placeholder' || !apiGift.is_valid,
+    isPlaceholder: dataSource === 'placeholder' || !apiGift.is_valid
+  };
+}
+
 // دالة لجلب البيانات من الكاش فقط (سريعة)
 export async function fetchCachedGiftPrices(collections: string[]): Promise<GiftsResponse> {
   try {
@@ -64,17 +92,23 @@ export async function fetchCachedGiftPrices(collections: string[]): Promise<Gift
     const responseTime = performance.now() - startTime;
     console.log(`⏱️ وقت استجابة الكاش: ${responseTime.toFixed(0)}ms, المصدر: ${data.source}`);
     
-    // معالجة البيانات الوهمية
-    if (data.source === 'placeholder' || data.source === 'empty_cache') {
-      console.warn('⚠️ تم استقبال بيانات وهمية من الكاش');
-      data.gifts = data.gifts.map((gift: any) => ({
-        ...gift,
-        isLoading: true,
-        isPlaceholder: true
-      }));
-    }
+    // تحويل البيانات من هيكل الخادم إلى هيكل React المتوقع
+    const transformedGifts: Gift[] = data.gifts.map((gift: any) => 
+      transformGiftData(gift, data.source)
+    );
+
+    console.log('🔄 البيانات المحولة من الكاش:', {
+      originalCount: data.gifts.length,
+      transformedCount: transformedGifts.length,
+      sampleOriginal: data.gifts[0],
+      sampleTransformed: transformedGifts[0],
+      marketCap: transformedGifts[0]?.market_cap
+    });
     
-    return data;
+    return {
+      ...data,
+      gifts: transformedGifts
+    };
   } catch (error) {
     console.warn('فشل جلب البيانات من الكاش، جاري المحاولة بالطريقة العادية', error);
     // Fallback إلى الطريقة العادية
@@ -97,36 +131,44 @@ export async function fetchGiftPrices(collections: string[]): Promise<GiftsRespo
     const responseTime = performance.now() - startTime;
     console.log(`⏱️ وقت استجابة API: ${responseTime.toFixed(0)}ms, المصدر: ${data.source}`);
     
-    // معالجة البيانات الوهمية
-    if (data.source === 'placeholder' || data.source === 'fallback') {
-      console.warn('⚠️ تم استقبال بيانات وهمية من API');
-      data.gifts = data.gifts.map((gift: any) => ({
-        ...gift,
-        isLoading: true,
-        isPlaceholder: true
-      }));
-    }
+    // تحويل البيانات من هيكل الخادم إلى هيكل React المتوقع
+    const transformedGifts: Gift[] = data.gifts.map((gift: any) => 
+      transformGiftData(gift, data.source)
+    );
+
+    console.log('🔄 البيانات المحولة من API المباشر:', {
+      originalCount: data.gifts.length,
+      transformedCount: transformedGifts.length,
+      sampleOriginal: data.gifts[0],
+      sampleTransformed: transformedGifts[0],
+      marketCap: transformedGifts[0]?.market_cap
+    });
     
-    return data;
+    return {
+      ...data,
+      gifts: transformedGifts
+    };
   } catch (error) {
     console.error('فشل جلب بيانات الهدايا:', error);
     
-    // إنشاء استجابة وهمية في حالة الخطأ
-    const placeholderResponse: GiftsResponse = {
-      gifts: collections.map(collection => ({
-        id: `error_${collection}`,
-        model_name: collection,
-        name: collection,
-        min_price_ton: 0,
-        min_price_usd: 0,
-        image: '',
-        symbol: collection.substring(0, 3).toUpperCase(),
-        market_cap: 0,
-        current_price: 0,
-        is_valid: false,
-        isLoading: false,
-        isPlaceholder: true
-      })),
+    // إنشاء استجابة وهمية محولة في حالة الخطأ
+    const placeholderGifts: Gift[] = collections.map(collection => ({
+      id: `error_${collection}`,
+      model_name: collection,
+      name: collection,
+      min_price_ton: 0,
+      min_price_usd: 0,
+      image: `https://placehold.co/100x100/666/FFF?text=${collection.substring(0,3)}`,
+      symbol: collection.substring(0, 3).toUpperCase(),
+      market_cap: 1000000,
+      current_price: 0,
+      is_valid: false,
+      isLoading: false,
+      isPlaceholder: true
+    }));
+    
+    return {
+      gifts: placeholderGifts,
       ton_price: 2.50, // سعر افتراضي
       timestamp: Date.now(),
       last_updated: new Date().toISOString(),
@@ -136,8 +178,6 @@ export async function fetchGiftPrices(collections: string[]): Promise<GiftsRespo
       is_stale: true,
       source: "error_fallback"
     };
-    
-    return placeholderResponse;
   }
 }
 

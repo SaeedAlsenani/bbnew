@@ -211,7 +211,7 @@ const App = () => {
               };
             });
           
-            etGiftsData(finalGifts);
+            setGiftsData(finalGifts);
             setSelectedGifts(finalGifts.map(g => g.id));
           
             // معالجة overallMinGift إذا كانت البيانات متاحة

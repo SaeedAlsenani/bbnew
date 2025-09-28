@@ -102,7 +102,7 @@ const BubbleCanvas: React.FC<BubbleCanvasProps> = ({
         const botBubble = createBotBubble(nodes, contentWidth, contentHeight);
         nodes.push(botBubble);
 
-        // إنشاء المحاكاة الفيزيائية المحسنة
+        // إنشاء المحاكاة الفيزيائية المحسنة - بدون قوة الجذب إلى الوسط
         const simulation = createEnhancedSimulation(nodes, contentWidth, contentHeight);
         simulationRef.current = simulation;
 
@@ -200,15 +200,22 @@ const BubbleCanvas: React.FC<BubbleCanvasProps> = ({
         };
     };
 
-    // إنشاء المحاكاة الفيزيائية المحسنة
+    // إنشاء المحاكاة الفيزيائية المحسنة - بدون قوة الجذب إلى الوسط
     const createEnhancedSimulation = (nodes: any[], width: number, height: number) => {
         const simulation = d3.forceSimulation(nodes)
-            .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('x', d3.forceX(width / 2).strength(d => d.isBot ? 0.8 : 0.1))
-            .force('y', d3.forceY(height / 2).strength(d => d.isBot ? 0.8 : 0.1))
+            // ❌ تم إزالة: .force('center', d3.forceCenter(width / 2, height / 2))
+            // ❌ تم إزالة: .force('x', d3.forceX(width / 2).strength(d => d.isBot ? 0.8 : 0.1))
+            // ❌ تم إزالة: .force('y', d3.forceY(height / 2).strength(d => d.isBot ? 0.8 : 0.1))
+            
+            // ✅ تم الإبقاء على: قوة التصادم
             .force('collision', d3.forceCollide().radius((d: any) => d.r + 5).strength(0.8))
+            
+            // ✅ تم الإبقاء على: قوة التنافر
             .force('charge', d3.forceManyBody().strength((d: any) => -Math.pow(d.r, 1.5) * 0.3))
+            
+            // ✅ تم الإبقاء على: قوة الحدود من Gift Bubbles
             .force('boundary', createBoundaryForce(width, height, 0.2))
+            
             .alphaDecay(0.02)
             .velocityDecay(0.4)
             .alphaTarget(0.1);
@@ -222,23 +229,29 @@ const BubbleCanvas: React.FC<BubbleCanvasProps> = ({
         return simulation;
     };
 
-    // قوة الحدود (من Gift Bubbles)
-    const createBoundaryForce = (width: number, height: number, strength: number = 0.1, padding: number = 20) => {
+    // قوة الحدود من Gift Bubbles - تحل محل قوة الجذب إلى الوسط
+    const createBoundaryForce = (width: number, height: number, strength: number = 0.2, padding: number = 20) => {
         let nodes: any[] = [];
         
         const force = () => {
             nodes.forEach((node: any) => {
                 const boundary = node.r + padding;
                 
+                // منع الخروج من الحدود اليسرى
                 if (node.x - boundary < 0) {
                     node.vx += (boundary - node.x) * strength;
-                } else if (node.x + boundary > width) {
+                } 
+                // منع الخروج من الحدود اليمنى
+                else if (node.x + boundary > width) {
                     node.vx += (width - boundary - node.x) * strength;
                 }
                 
+                // منع الخروج من الحدود العلوية
                 if (node.y - boundary < 0) {
                     node.vy += (boundary - node.y) * strength;
-                } else if (node.y + boundary > height) {
+                } 
+                // منع الخروج من الحدود السفلية
+                else if (node.y + boundary > height) {
                     node.vy += (height - boundary - node.y) * strength;
                 }
             });

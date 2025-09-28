@@ -1,10 +1,8 @@
-// src/App.tsx - النسخة المحدثة بعد الفصل
+// src/App.tsx - النسخة المحدثة بعد إزالة العناصر
 import React, { useState, useEffect, useMemo } from 'react';
 import BubbleCanvas from './components/BubbleCanvas';
 import GiftModal from './components/GiftModal';
 import { GiftFilter } from './components/GiftFilter';
-import { DataSourceIndicator } from './components/DataSourceIndicator';
-import { FooterInfoBar } from './components/FooterInfoBar';
 import { useCollections } from './hooks/useCollections';
 import { useGifts } from './hooks/useGifts';
 import { Gift } from './interfaces/gift.interface';
@@ -23,9 +21,6 @@ const App = () => {
         overallMinGift, 
         tonPrice, 
         loading: giftsLoading, 
-        error: giftsError, 
-        dataSource, 
-        hasPlaceholderData, 
         fetchGiftsData, 
         isGiftLoaded,
         handleFilterChange
@@ -104,6 +99,7 @@ const App = () => {
                 `}
             </style>
             
+            {/* الشريط العلوي فقط - تم إزالة المؤشرات */}
             <div className="w-full flex items-center justify-between p-1 bg-gray-800 rounded-lg shadow-lg border border-gray-700 mb-2">
                 <div className="flex items-center space-x-1 md:space-x-2">
                     <div className="relative">
@@ -159,19 +155,17 @@ const App = () => {
                     </button>
                 </div>
             </div>
-            
-            <DataSourceIndicator 
-                dataSource={dataSource}
-                hasPlaceholderData={hasPlaceholderData}
-            />
 
-            <BubbleCanvas
-                cryptoData={filteredGifts}
-                loading={giftsLoading}
-                selectedCryptos={selectedGifts}
-                sortMethod={sortMethod === 'price' ? 'marketCap' : 'random'}
-                onBubbleClick={setSelectedBubbleData}
-            />
+            {/* حاوية الفقاعات فقط - بدون مؤشرات أو شريط سفلي */}
+            <div className="flex-1">
+                <BubbleCanvas
+                    cryptoData={filteredGifts}
+                    loading={giftsLoading}
+                    selectedCryptos={selectedGifts}
+                    sortMethod={sortMethod === 'price' ? 'marketCap' : 'random'}
+                    onBubbleClick={setSelectedBubbleData}
+                />
+            </div>
 
             {selectedBubbleData && (
                 <GiftModal 
@@ -179,11 +173,6 @@ const App = () => {
                     onClose={() => setSelectedBubbleData(null)} 
                 />
             )}
-
-            <FooterInfoBar 
-                tonPrice={tonPrice}
-                overallMinGift={overallMinGift}
-            />
         </div>
     );
 };

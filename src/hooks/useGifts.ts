@@ -3,6 +3,7 @@ import { Gift } from '../interfaces/gift.interface';
 
 export const useGifts = (collections: string[]) => {
   const [giftsData, setGiftsData] = useState<Gift[]>([]);
+  const [selectedGifts, setSelectedGifts] = useState<string[]>([]);
   const [overallMinGift, setOverallMinGift] = useState<Gift | null>(null);
   const [tonPrice, setTonPrice] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +35,7 @@ export const useGifts = (collections: string[]) => {
       }));
 
       setGiftsData(placeholderGifts);
+      setSelectedGifts(placeholderGifts.map(g => g.id));
 
       let apiData;
       let dataSourceType: 'cache' | 'live' | 'stale' | 'placeholder' = 'cache';
@@ -95,6 +97,7 @@ export const useGifts = (collections: string[]) => {
       });
 
       setGiftsData(finalGifts);
+      setSelectedGifts(finalGifts.map(g => g.id));
 
       const validGifts = transformedGifts.filter(g => g.is_valid && g.min_price_usd > 0);
       if (validGifts.length > 0) {
@@ -144,6 +147,7 @@ export const useGifts = (collections: string[]) => {
       }));
       
       setGiftsData(errorPlaceholders);
+      setSelectedGifts(errorPlaceholders.map(g => g.id));
     } finally {
       setLoading(false);
     }
@@ -153,8 +157,17 @@ export const useGifts = (collections: string[]) => {
     return gift.is_valid && gift.min_price_usd > 0 && !gift.isLoading;
   }, []);
 
+  const handleFilterChange = useCallback((giftId: string) => {
+    setSelectedGifts(prevSelected => 
+      prevSelected.includes(giftId)
+        ? prevSelected.filter(id => id !== giftId)
+        : [...prevSelected, giftId]
+    );
+  }, []);
+
   return {
     giftsData,
+    selectedGifts,
     overallMinGift,
     tonPrice,
     loading,
@@ -163,6 +176,6 @@ export const useGifts = (collections: string[]) => {
     hasPlaceholderData,
     fetchGiftsData,
     isGiftLoaded,
-    setGiftsData
+    handleFilterChange
   };
 };

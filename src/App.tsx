@@ -19,6 +19,7 @@ const App = () => {
     const { collections, loading: collectionsLoading, error: collectionsError, fetchCollectionsData } = useCollections();
     const { 
         giftsData, 
+        selectedGifts,
         overallMinGift, 
         tonPrice, 
         loading: giftsLoading, 
@@ -26,11 +27,11 @@ const App = () => {
         dataSource, 
         hasPlaceholderData, 
         fetchGiftsData, 
-        isGiftLoaded 
+        isGiftLoaded,
+        handleFilterChange
     } = useGifts(collections);
 
     const [isFilterOpen, setIsFilterOpen] = useState(false);
-    const [selectedGifts, setSelectedGifts] = useState<string[]>([]);
     const [sortMethod, setSortMethod] = useState<'random' | 'price'>('random');
     const [selectedTimeframe, setSelectedTimeframe] = useState('Day');
     const [selectedBubbleData, setSelectedBubbleData] = useState<Gift | null>(null);
@@ -55,14 +56,6 @@ const App = () => {
         giftsData.filter(gift => selectedGifts.includes(gift.id)),
         [giftsData, selectedGifts]
     );
-
-    const handleFilterChange = (giftId: string) => {
-        setSelectedGifts(prevSelected => 
-            prevSelected.includes(giftId)
-                ? prevSelected.filter(id => id !== giftId)
-                : [...prevSelected, giftId]
-        );
-    };
 
     const handleTimeframeChange = (timeframe: string) => {
         setSelectedTimeframe(timeframe);

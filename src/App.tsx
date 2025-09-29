@@ -1,6 +1,6 @@
 // src/App.tsx - النسخة المحدثة بعد إزالة العناصر
 import React, { useState, useEffect, useMemo } from 'react';
-import BubbleCanvas from './components/BubbleCanvas';
+import BubbleCanvas from './components/BubbleCanvas/BubbleCanvas';
 import GiftModal from './components/GiftModal';
 import { GiftFilter } from './components/GiftFilter';
 import { useCollections } from './hooks/useCollections';

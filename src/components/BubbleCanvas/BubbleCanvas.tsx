@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { useBubbleTooltip } from './hooks/useBubbleTooltip';
-import { calculateBubbleSizes, createBotBubble } from './utils/bubbleLayout';
+import { calculateBubbleSizes, createBotBubble, processBubbleData } from './utils/bubbleLayout';
 import { createEnhancedSimulation } from './utils/bubbleForces';
 import { setupDragBehavior } from './utils/bubbleDrag';
 import { createGradients, drawBubbles } from './renderers/bubbleRenderer';
@@ -12,6 +12,7 @@ const BubbleCanvas: React.FC<BubbleCanvasProps> = ({
     loading = false, 
     selectedCryptos = [], 
     sortMethod = 'marketCap', 
+    timePeriod = '24h',
     onBubbleClick 
 }) => {
     const svgRef = useRef<SVGSVGElement>(null);
@@ -77,8 +78,11 @@ const BubbleCanvas: React.FC<BubbleCanvasProps> = ({
             sortedData.sort((a, b) => (b.price_change_percentage_24h || 0) - (a.price_change_percentage_24h || 0));
         }
 
-        // حساب أحجام الفقاعات باستخدام منطق Gift Bubbles المتقدم
-        const nodes = calculateBubbleSizes(sortedData, contentWidth, contentHeight);
+        // ⬇️ معالجة البيانات حسب الفترة الزمنية
+        const processedData = processBubbleData(sortedData, timePeriod);
+        
+        // ⬇️ حساب أحجام الفقاعات باستخدام البيانات المعالجة
+        const nodes = calculateBubbleSizes(processedData, contentWidth, contentHeight);
         
         // إضافة فقاعة البوت (مثل Gift Bubbles)
         const botBubble = createBotBubble(nodes, contentWidth, contentHeight);
@@ -121,7 +125,7 @@ const BubbleCanvas: React.FC<BubbleCanvasProps> = ({
                 simulationRef.current.stop();
             }
         };
-    }, [cryptoData, loading, selectedCryptos, sortMethod, dimensions, onBubbleClick, setupTooltips]);
+    }, [cryptoData, loading, selectedCryptos, sortMethod, timePeriod, dimensions, onBubbleClick, setupTooltips]);
 
     // حالة التحميل المحسنة
     if (loading) {

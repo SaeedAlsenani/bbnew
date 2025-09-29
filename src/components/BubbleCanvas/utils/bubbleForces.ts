@@ -1,26 +1,26 @@
 import * as d3 from 'd3';
 
-export const createBoundaryForce = (width: number, height: number, strength: number = 0.2, padding: number = 20) => {
+export const createBoundaryForce = (width: number, height: number, strength: number = 0.2, padding: number = 5) => {
     let nodes: any[] = [];
     
     const force = () => {
         nodes.forEach((node: any) => {
-            const boundary = node.r + padding;
+            const boundary = node.r; // استخدام نصف قطر الفقاعة فقط بدون padding إضافي
             
-            // منع الخروج من الحدود اليسرى
+            // منع الخروج من الحدود اليسرى - السماح بملامسة الحافة
             if (node.x - boundary < 0) {
                 node.vx += (boundary - node.x) * strength;
             } 
-            // منع الخروج من الحدود اليمنى
+            // منع الخروج من الحدود اليمنى - السماح بملامسة الحافة
             else if (node.x + boundary > width) {
                 node.vx += (width - boundary - node.x) * strength;
             }
             
-            // منع الخروج من الحدود العلوية
+            // منع الخروج من الحدود العلوية - السماح بملامسة الحافة
             if (node.y - boundary < 0) {
                 node.vy += (boundary - node.y) * strength;
             } 
-            // منع الخروج من الحدود السفلية
+            // منع الخروج من الحدود السفلية - السماح بملامسة الحافة
             else if (node.y + boundary > height) {
                 node.vy += (height - boundary - node.y) * strength;
             }

@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { Gift } from './bubbleTypes';
+import { Gift } from '../types/bubbleTypes';
 
 export const BUBBLE_CONFIG = {
     minRadiusFactor: 0.03,
@@ -8,12 +8,35 @@ export const BUBBLE_CONFIG = {
     botRadiusFactor: 0.6
 };
 
-export const calculateBubbleSizes = (data: Gift[], width: number, height: number, targetCoverage: number = BUBBLE_CONFIG.targetCoverage) => {
+// ⬇️ دالة جديدة للحصول على القيمة حسب الفترة
+export const getValueByPeriod = (item: Gift, period: string): number => {
+    switch (period) {
+        case '7d':
+            return item.change_7d || item.price_change_percentage_24h || 0;
+        case '30d':
+            return item.change_30d || item.price_change_percentage_24h || 0;
+        case 'marketCap':
+            return item.market_cap || 0;
+        default: // '24h'
+            return item.price_change_percentage_24h || 0;
+    }
+};
+
+// ⬇️ دالة جديدة لمعالجة البيانات حسب الفترة
+export const processBubbleData = (data: Gift[], period: string = '24h'): any[] => {
+    return data.map(item => ({
+        ...item,
+        displayValue: getValueByPeriod(item, period), // قيمة العرض
+        value: item.price_change_percentage_24h || 0  // قيمة التلوين تبقى 24h
+    }));
+};
+
+// ⬇️ دالة حساب الأسعار المحسنة
+export const calculateBubbleSizes = (data: any[], width: number, height: number, targetCoverage: number = BUBBLE_CONFIG.targetCoverage) => {
     const totalArea = width * height;
     const minRadius = Math.min(width, height) * BUBBLE_CONFIG.minRadiusFactor;
     const maxRadius = Math.min(width, height) * BUBBLE_CONFIG.maxRadiusFactor;
 
-    // البحث الثنائي لإيجاد الحجم المناسب (مثل Gift Bubbles)
     let low = 1e-6;
     let high = 1000;
     let result: any[] = [];
@@ -22,12 +45,17 @@ export const calculateBubbleSizes = (data: Gift[], width: number, height: number
         const mid = (low + high) / 2;
         
         const bubbles = data.map(item => {
-            const value = Math.abs(item.market_cap) || Math.abs(item.current_price) || 1;
-            const radius = Math.min(maxRadius, Math.max(minRadius, Math.sqrt(mid * value)));
+            // ⬇️ استخدام القيمة المطلقة للتغير (سواء موجب أو سالب)
+            const changeValue = Math.abs(item.displayValue) || 1;
+            // ⬇️ التأكد من أن القيمة لا تقل عن 0.1 لتجنب الفقاعات الصغيرة جداً
+            const normalizedValue = Math.max(0.1, changeValue);
+            const radius = Math.min(maxRadius, Math.max(minRadius, Math.sqrt(mid * normalizedValue)));
+            
             return { 
                 ...item, 
                 r: radius,
-                value: item.price_change_percentage_24h || 0
+                // ⬇️ الحفاظ على قيمة التلوين الأصلية
+                value: item.value
             };
         });
 
@@ -68,6 +96,7 @@ export const createBotBubble = (nodes: any[], width: number, height: number) => 
         min_price_usd: 0,
         x: width / 2,
         y: height / 2,
-        value: 0
+        value: 0,
+        displayValue: 0
     };
 };

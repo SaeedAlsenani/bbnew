@@ -152,7 +152,7 @@ const BubbleCanvas: React.FC<BubbleCanvasProps> = ({
     }
 
     return (
-        <div ref={containerRef} className="relative w-full h-full bg-gradient-to-br from-black via-gray-900 to-black"> 
+        <div ref={containerRef} className="relative w-full h-full bg-black">
             <svg 
                 ref={svgRef} 
                 className="w-full h-full"
